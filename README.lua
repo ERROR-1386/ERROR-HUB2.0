@@ -1,5 +1,7 @@
--- Укажите здесь свой Telegram-канал (измените текст внутри кавычек)
-local myTelegramChannel = "t.me/ERROR_HUB_BABFT"
+-- ================= НАСТРОЙКА БЕЙДЖИКА TELEGRAM =================
+local titleText = "СКРИПТ АКТИВИРОВАН!"
+local tgText = "Наш Telegram: t.me/ERROR_HUB_BABFT"
+-- ===============================================================
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -16,6 +18,7 @@ local goldEarned = 0
 local initialGold = nil
 local fpsBoostActive = false
 
+-- Поиск значения золота в данных игрока
 local goldValue = localPlayer:FindFirstChild("Data") and localPlayer.Data:FindFirstChild("Gold") or localPlayer:WaitForChild("leaderstats", 5) and localPlayer.leaderstats:FindFirstChild("Gold")
 
 local farmPoints = {
@@ -90,7 +93,7 @@ local function loopAutoFarm()
     removePlatform()
 end
 
--- Anti-AFK
+-- ================= SYSTEMA ANTI-AFK =================
 local function enableAntiAFK()
     local vu = game:GetService("VirtualUser")
     localPlayer.Idled:Connect(function()
@@ -101,7 +104,7 @@ local function enableAntiAFK()
 end
 task.spawn(enableAntiAFK)
 
--- FPS BOOST
+-- ================= OPTIMIZATION FUNCTION =================
 local function removeTextures()
     game:GetService("Lighting").GlobalShadows = false
     for _, effect in ipairs(game:GetService("Lighting"):GetChildren()) do
@@ -182,62 +185,6 @@ goldLabel.TextSize = 13
 goldLabel.TextXAlignment = Enum.TextXAlignment.Left
 goldLabel.Parent = mainFrame
 
--- ================= TG NOTIFICATION (BAGE) =================
-local function spawnTgNotification()
-    local bageFrame = Instance.new("Frame")
-    -- Начальная позиция спрятана за правым краем экрана
-    bageFrame.Position = UDim2.new(1, 20, 1, -85)
-    bageFrame.Size = UDim2.new(0, 220, 0, 65)
-    bageFrame.BackgroundColor3 = Color3.fromRGB(0, 136, 204) -- Фирменный цвет Telegram
-    bageFrame.BorderSizePixel = 0
-    bageFrame.Parent = screenGui
-    
-    Instance.new("UICorner", bageFrame).CornerRadius = UDim.new(0, 10)
-    Instance.new("UIStroke", bageFrame).Color = Color3.fromRGB(255, 255, 255)
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 25)
-    title.Position = UDim2.new(0, 0, 0, 8)
-    title.BackgroundTransparency = 1
-    title.Text = "✈ Наш Telegram канал:"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 13
-    title.Parent = bageFrame
-    
-    local channelText = Instance.new("TextLabel")
-    channelText.Size = UDim2.new(1, 0, 0, 25)
-    channelText.Position = UDim2.new(0, 0, 0, 28)
-    channelText.BackgroundTransparency = 1
-    channelText.Text = myTelegramChannel
-    channelText.TextColor3 = Color3.fromRGB(255, 255, 100) -- Подсветим желтым для акцента
-    channelText.Font = Enum.Font.GothamBold
-    channelText.TextSize = 14
-    channelText.Parent = bageFrame
-
-    -- Анимация появления (выплывает справа налево)
-    local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    local targetPosIn = UDim2.new(1, -240, 1, -85)
-    local tweenIn = TweenService:Create(bageFrame, tweenInfo, {Position = targetPosIn})
-    tweenIn:Play()
-    
-    -- Ждем 5 секунд и прячем обратно
-    task.wait(5)
-    
-    local tweenInfoOut = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-    local targetPosOut = UDim2.new(1, 20, 1, -85)
-    local tweenOut = TweenService:Create(bageFrame, tweenInfoOut, {Position = targetPosOut})
-    tweenOut:Play()
-    
-    tweenOut.Completed:Connect(function()
-        bageFrame:Destroy()
-    end)
-end
-
--- Сразу запускаем показ уведомления при инжекте
-task.spawn(spawnTgNotification)
-
--- Логика кнопок
 boostButton.MouseButton1Click:Connect(function()
     if not fpsBoostActive then
         fpsBoostActive = true
@@ -266,4 +213,60 @@ task.spawn(function()
             local elapsed = math.floor(os.time() - startTime) + totalSessionTime
             local hours = math.floor(elapsed / 3600)
             local minutes = math.floor((elapsed % 3600) / 60)
-local seconds = elapsed % 60timeLabel.Text = string.format("⏱ Время: %02d:%02d:%02d", hours, minutes, seconds)endtask.wait(1)endend)toggleButton.MouseButton1Click:Connect(function()autoFarmActive = not autoFarmActiveif autoFarmActive thentoggleButton.Text = "AUTO FARM: ON"toggleButton.BackgroundColor3 = Color3.fromRGB(46, 184, 114)if goldValue and not initialGold theninitialGold = goldValue.ValueendstartTime = os.time()task.spawn(loopAutoFarm)elsetoggleButton.Text = "AUTO FARM: OFF"toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)totalSessionTime = totalSessionTime + (os.time() - startTime)setCharacterVisibility(true)endend)
+            local seconds = elapsed % 60
+            timeLabel.Text = string.format("⏱ Время: %02d:%02d:%02d", hours, minutes, seconds)
+        end
+        task.wait(1)
+    end
+end)
+
+toggleButton.MouseButton1Click:Connect(function()
+    autoFarmActive = not autoFarmActive
+    
+    if autoFarmActive then
+        toggleButton.Text = "AUTO FARM: ON"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(46, 184, 114)
+        
+        if goldValue and not initialGold then
+            initialGold = goldValue.Value
+        end
+        
+        startTime = os.time()
+        task.spawn(loopAutoFarm)
+    else
+        toggleButton.Text = "AUTO FARM: OFF"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
+        
+        totalSessionTime = totalSessionTime + (os.time() - startTime)
+        setCharacterVisibility(true)
+    end
+end)
+
+-- ================= СОЗДАНИЕ ВСПЛЫВАЮЩЕГО БЕЙДЖИКА =================
+local function spawnTgNotification()
+    local notificationFrame = Instance.new("Frame")
+    notificationFrame.Size = UDim2.new(0, 260, 0, 70)
+    notificationFrame.Position = UDim2.new(1, 20, 1, -90) -- Скрыт изначально за краем
+    notificationFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+    notificationFrame.BorderSizePixel = 0
+    notificationFrame.Parent = screenGui
+
+    Instance.new("UICorner", notificationFrame).CornerRadius = UDim.new(0, 10)
+    local stroke = Instance.new("UIStroke", notificationFrame)
+    stroke.Color = Color3.fromRGB(0, 150, 255)
+    stroke.Thickness = 1.5
+
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.new(0, 40, 1, 0)
+    icon.BackgroundTransparency = 1
+    icon.Text = "✈️"
+    icon.TextSize = 24
+    icon.Parent = notificationFrame
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -50, 0, 30)
+    title.Position = UDim2.new(0, 45, 0, 8)
+    title.BackgroundTransparency = 1
+    title.Text = titleText
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBoldtitle.TextSize = 14title.TextXAlignment = Enum.TextXAlignment.Lefttitle.Parent = notificationFramelocal sub = Instance.new("TextLabel")sub.Size = UDim2.new(1, -50, 0, 25)sub.Position = UDim2.new(0, 45, 0, 32)sub.BackgroundTransparency = 1sub.Text = tgTextsub.TextColor3 = Color3.fromRGB(0, 180, 255)sub.Font = Enum.Font.Gothamsub.TextSize = 12sub.TextXAlignment = Enum.TextXAlignment.Leftsub.Parent = notificationFramelocal tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)local tweenOutInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)local targetPos = UDim2.new(1, -280, 1, -90)local hidePos = UDim2.new(1, 20, 1, -90)local tweenIn = TweenService:Create(notificationFrame, tweenInfo, {Position = targetPos})local tweenOut = TweenService:Create(notificationFrame, tweenOutInfo, {Position = hidePos})task.spawn(function()tweenIn:Play()task.wait(5)tweenOut:Play()tweenOut.Completed:Connect(function()notificationFrame:Destroy()end)end)end-- Запускаем показ уведомления при инжекте скриптаtask.spawn(spawnTgNotification)
