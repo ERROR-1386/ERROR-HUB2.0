@@ -1,54 +1,20 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Переменные контроля авто-фарма
 local autoFarmActive = false
 local currentPlatform = nil
 
-local UserInputService = game:GetService("UserInputService")
+-- Переменные для статистики
+local startTime = 0
+local totalSessionTime = 0
+local goldEarned = 0
+local initialGold = nil
+local fpsBoostActive = false
 
-local clickTPActive = false
-local tpConnection = nil
+-- Поиск значения золота в данных игрока
+local goldValue = localPlayer:FindFirstChild("Data") and localPlayer.Data:FindFirstChild("Gold") or localPlayer:WaitForChild("leaderstats", 5) and localPlayer.leaderstats:FindFirstChild("Gold")
 
--- Функция, которая активирует телепорт по клику
-local function toggleClickTP(button)
-    clickTPActive = not clickTPActive
-    
-    if clickTPActive then
-        button.Text = "CLICK TP: ON"
-        button.BackgroundColor3 = Color3.fromRGB(46, 184, 114) -- Зеленая
-        
-        -- Начинаем отслеживать клики мыши
-        local mouse = localPlayer:GetMouse()
-        tpConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            -- Проверяем, что нажат левый клик мыши и игрок не кликает по кнопкам меню
-            if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
-                local character = localPlayer.Character
-                local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                
-                -- Проверяем, куда именно указывает мышка в мире
-                if rootPart and mouse.Target then
-                    -- Переносим персонажа чуть выше точки клика, чтобы не застрять в текстурах
-                    rootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
-                end
-            end
-        end)
-    else
-        button.Text = "CLICK TP: OFF"
-        button.BackgroundColor3 = Color3.fromRGB(230, 75, 75) -- Красная
-        
-        -- Отключаем отслеживание кликов
-        if tpConnection then
-            tpConnection:Disconnect()
-            tpConnection = nil
-        end
-    end
-end
-
-
--- Точный список координат до самого сундука
 local farmPoints = {
     CFrame.new(-135.058548, 71.5735931, 1389.66492, 1, 0, 0, 0, 1, 0, 0, 0, 1),
     CFrame.new(-121.212387, 94.811821, 2182.42432, 1, 0, 0, 0, 1, 0, 0, 0, 1),
@@ -63,7 +29,6 @@ local farmPoints = {
     CFrame.new(-52.9334259, -361.626831, 9489.81543, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 }
 
--- Функция удаления старой платформы
 local function removePlatform()
     if currentPlatform then
         currentPlatform:Destroy()
@@ -71,7 +36,6 @@ local function removePlatform()
     end
 end
 
--- Функция создания платформы под ногами
 local function spawnPlatform(cframe)
     removePlatform()
     local part = Instance.new("Part")
@@ -79,20 +43,42 @@ local function spawnPlatform(cframe)
     part.CFrame = cframe * CFrame.new(0, -3.5, 0)
     part.Anchored = true
     part.Transparency = 0.5
-    part.Color = Color3.fromRGB(0, 255, 255)
+    part.Color = Color3.fromRGB(255, 30, 30)
     part.Material = Enum.Material.Neon
     part.Parent = workspace
     currentPlatform = part
 end
 
--- Функция бесконечного цикла телепортации
+-- Функция скрытия элементов тела (чтобы вас точно никто не увидел локально)
+local function setCharacterVisibility(visible)
+    local character = localPlayer.Character
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                if part.Name ~= "HumanoidRootPart" then
+                    part.Transparency = visible and 0 or 1
+                end
+            end
+        end
+    end
+end
+
 local function loopAutoFarm()
     while autoFarmActive do
         local character = localPlayer.Character
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        if rootPart and rootPart.Parent then
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if rootPart and rootPart.Parent and humanoid then
+            -- Включаем режим невидимости (скрываем детали персонажа)
+            setCharacterVisibility(false)
+            
             for _, cframe in ipairs(farmPoints) do
                 if not autoFarmActive then break end
+                
+                -- Подстраховка: отключаем смерть от падения под карту
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                
                 spawnPlatform(cframe)
                 rootPart.CFrame = cframe
                 task.wait(1)
@@ -101,377 +87,156 @@ local function loopAutoFarm()
         removePlatform()
         task.wait(1)
     end
+    -- Возвращаем видимость при выключении
+    setCharacterVisibility(true)
     removePlatform()
 end
 
--- ================= SYSTEMA ПОДАРКОВ (GIFT) =================
-local MarketplaceService = game:GetService("MarketplaceService")
-local giftItems = {
-    {Name = "+3 Egg Cannons", Id = 1161573830},
-    {Name = "+5 Dragon Harpoons", Id = 1109792539},
-    {Name = "+5 Duel Harpoons", Id = 1126344149},
-    {Name = "+4 Cookie Wheels", Id = 1126385548}
-}
-
-local selectedGiftId = nil
-local selectedGiftName = ""
-
-local function createGiftUI(parentPage)
-    local nameBox = Instance.new("TextBox")
-    nameBox.Size = UDim2.new(1, -10, 0, 40)
-    nameBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    nameBox.BorderSizePixel = 0
-    nameBox.Text = ""
-    nameBox.PlaceholderText = "Введите точный ник игрока..."
-    nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameBox.Font = Enum.Font.Gotham
-    nameBox.TextSize = 14
-    nameBox.Parent = parentPage
-    Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", nameBox).Color = Color3.fromRGB(100, 100, 100)
-
-    local dropButton = Instance.new("TextButton")
-    dropButton.Size = UDim2.new(1, -10, 0, 40)
-    dropButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    dropButton.BorderSizePixel = 0
-    dropButton.Text = "🔽 Выберите предмет для подарка"
-    dropButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-    dropButton.Font = Enum.Font.GothamBold
-    dropButton.TextSize = 13
-    dropButton.Parent = parentPage
-    Instance.new("UICorner", dropButton).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", dropButton).Color = Color3.fromRGB(120, 120, 120)
-
-    local dropFrame = Instance.new("ScrollingFrame")
-    dropFrame.Size = UDim2.new(1, -10, 0, 120)
-    dropFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    dropFrame.BorderSizePixel = 0
-    dropFrame.Visible = false
-    dropFrame.CanvasSize = UDim2.new(0, 0, 0, #giftItems * 35)
-    dropFrame.ScrollBarThickness = 4
-    dropFrame.ZIndex = 5
-    dropFrame.Parent = parentPage
-    Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIListLayout", dropFrame).Padding = UDim.new(0, 2)
-
-    for _, item in ipairs(giftItems) do
-        local itemBtn = Instance.new("TextButton")
-        itemBtn.Size = UDim2.new(1, 0, 0, 32)
-        itemBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        itemBtn.BorderSizePixel = 0
-        itemBtn.Text = item.Name
-        itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        itemBtn.Font = Enum.Font.Gotham
-        itemBtn.TextSize = 13
-        itemBtn.ZIndex = 6
-        itemBtn.Parent = dropFrame
-
-        itemBtn.MouseButton1Click:Connect(function()
-            selectedGiftId = item.Id
-            selectedGiftName = item.Name
-            dropButton.Text = "🎁 Выбрано: " .. item.Name
-            dropButton.TextColor3 = Color3.fromRGB(255, 215, 0)
-            dropFrame.Visible = false
-        end)
-    end
-
-    dropButton.MouseButton1Click:Connect(function()
-        dropFrame.Visible = not dropFrame.Visible
-    end)
-
-    local sendButton = Instance.new("TextButton")
-    sendButton.Size = UDim2.new(1, -10, 0, 45)
-    sendButton.BackgroundColor3 = Color3.fromRGB(190, 40, 80)
-    sendButton.Text = "🎁 SEND GIFT"
-    sendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    sendButton.Font = Enum.Font.GothamBold
-    sendButton.TextSize = 14
-    sendButton.Parent = parentPage
-    Instance.new("UICorner", sendButton).CornerRadius = UDim.new(0, 8)
-
-    sendButton.MouseButton1Click:Connect(function()
-        local cleanName = string.gsub(nameBox.Text, "^%s*(.-)%s*$", "%1")
-        if cleanName == "" or cleanName == localPlayer.Name then
-            dropButton.Text = "❌ Введите чужой ник!"
-            dropButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        if not selectedGiftId then
-            dropButton.Text = "❌ Выберите предмет из списка!"
-            dropButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        local targetUserId = nil
-        pcall(function() targetUserId = game.Players:GetUserIdFromNameAsync(cleanName) end)
-        if not targetUserId then
-            dropButton.Text = "❌ Игрок не найден!"
-            dropButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-
-        local updateEvent = workspace:FindFirstChild("UpdateLastGiftedIDRE")
-        if updateEvent and updateEvent:IsA("RemoteEvent") then
-            updateEvent:FireServer(targetUserId, cleanName)
-        end
-        task.wait(0.3)
-
-        local robuxEvent = workspace:FindFirstChild("PromptRobuxEvent")
-        if robuxEvent and robuxEvent:IsA("RemoteFunction") then
-            robuxEvent:InvokeServer(selectedGiftId, "Product")
-            dropButton.Text = "✔️ Запрос на гифт отправлен!"
-            dropButton.TextColor3 = Color3.fromRGB(100, 255, 100)
-        else
-            dropButton.Text = "❌ Событие не найдено!"
-            dropButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
+-- ================= SYSTEMA ANTI-AFK =================
+local function enableAntiAFK()
+    local vu = game:GetService("VirtualUser")
+    localPlayer.Idled:Connect(function()
+        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     end)
 end
+task.spawn(enableAntiAFK)
 
--- ================= СОЗДАНИЕ ИНТЕРФЕЙСА =================
+-- ================= OPTIMIZATION FUNCTION =================
+local function removeTextures()
+    game:GetService("Lighting").GlobalShadows = false
+    for _, effect in ipairs(game:GetService("Lighting"):GetChildren()) do
+        if effect:IsA("PostEffect") or effect:IsA("Atmosphere") or effect:IsA("Sky") or effect:IsA("Clouds") then
+            effect:Destroy()
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj ~= currentPlatform then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+            obj.CastShadow = false
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+            obj:Destroy()
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Fire") then
+            obj:Destroy()
+        end
+    end
+end
+
+-- ================= UI MENU & STATS =================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PremiumShopGui"
+screenGui.Name = "FarmToggleGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 60, 0, 60)
-toggleButton.Position = UDim2.new(0, 20, 0.5, -30)
-toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toggleButton.BorderSizePixel = 0
-toggleButton.Text = "🎃"
-toggleButton.TextSize = 25
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.Active = true
-toggleButton.Draggable = true
-toggleButton.Parent = screenGui
-Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 50)
-local toggleStroke = Instance.new("UIStroke", toggleButton)
-toggleStroke.Color = Color3.fromRGB(218, 165, 32)
-toggleStroke.Thickness = 2
-
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 450, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -225, 0.5, -150)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Size = UDim2.new(0, 200, 0, 190)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
-mainFrame.ClipsDescendants = true
-mainFrame.Active = true
-mainFrame.Draggable = true
 mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
-local frameStroke = Instance.new("UIStroke", mainFrame)
-frameStroke.Color = Color3.fromRGB(60, 60, 60)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(60, 60, 60)
 
-local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(1, 0, 0, 50)
-topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-topBar.BorderSizePixel = 0
-topBar.Parent = mainFrame
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 16)
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, -20, 0, 40)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
+toggleButton.Text = "AUTO FARM: OFF"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 13
+toggleButton.Parent = mainFrame
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -60, 1, 0)
-titleLabel.Position = UDim2.new(0, 20, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "PREMIUM MENU"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 18
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = topBar
+local boostButton = Instance.new("TextButton")
+boostButton.Size = UDim2.new(1, -20, 0, 40)
+boostButton.Position = UDim2.new(0, 10, 0, 55)
+boostButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+boostButton.Text = "FPS BOOST: OFF"
+boostButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+boostButton.Font = Enum.Font.GothamBold
+boostButton.TextSize = 13
+boostButton.Parent = mainFrame
+Instance.new("UICorner", boostButton).CornerRadius = UDim.new(0, 6)
 
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -40, 0.5, -15)
-closeButton.BackgroundTransparency = 1
-closeButton.Text = "✕"
-closeButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-closeButton.TextSize = 18
-closeButton.Font = Enum.Font.GothamBold
-closeButton.Parent = topBar
+local timeLabel = Instance.new("TextLabel")
+timeLabel.Size = UDim2.new(1, -20, 0, 30)
+timeLabel.Position = UDim2.new(0, 10, 0, 110)
+timeLabel.BackgroundTransparency = 1
+timeLabel.Text = "⏱ Время: 00:00:00"
+timeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+timeLabel.Font = Enum.Font.Gotham
+timeLabel.TextSize = 13
+timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+timeLabel.Parent = mainFrame
 
-local categoryPanel = Instance.new("Frame")
-categoryPanel.Size = UDim2.new(0, 120, 1, -50)
-categoryPanel.Position = UDim2.new(0, 0, 0, 50)
-categoryPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-categoryPanel.BorderSizePixel = 0
-categoryPanel.Parent = mainFrame
+local goldLabel = Instance.new("TextLabel")
+goldLabel.Size = UDim2.new(1, -20, 0, 30)
+goldLabel.Position = UDim2.new(0, 10, 0, 145)
+goldLabel.BackgroundTransparency = 1
+goldLabel.Text = "💰 Золото: +0"
+goldLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+goldLabel.Font = Enum.Font.GothamBold
+goldLabel.TextSize = 13
+goldLabel.TextXAlignment = Enum.TextXAlignment.Left
+goldLabel.Parent = mainFrame
 
-local categoryList = Instance.new("UIListLayout", categoryPanel)
-categoryList.Padding = UDim.new(0, 5)
-categoryList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local containerFrame = Instance.new("Frame")
-containerFrame.Size = UDim2.new(1, -120, 1, -50)
-containerFrame.Position = UDim2.new(0, 120, 0, 50)
-containerFrame.BackgroundTransparency = 1
-containerFrame.Parent = mainFrame
-
-local pages = {}
-
-local function createCategory(name)
-    local tabButton = Instance.new("TextButton")
-    tabButton.Size = UDim2.new(1, -10, 0, 40)
-    tabButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    tabButton.BorderSizePixel = 0
-    tabButton.Text = name
-    tabButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-    tabButton.Font = Enum.Font.GothamBold
-    tabButton.TextSize = 14
-    tabButton.Parent = categoryPanel
-    Instance.new("UICorner", tabButton).CornerRadius = UDim.new(0, 8)
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, -20, 1, -20)
-    page.Position = UDim2.new(0, 10, 0, 10)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.Visible = false
-    page.CanvasSize = UDim2.new(0, 0, 0, 450)
-    page.ScrollBarThickness = 4
-    page.Parent = containerFrame
-
-    local pageList = Instance.new("UIListLayout", page)
-    pageList.Padding = UDim.new(0, 10)
-    pageList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    pages[name] = {Button = tabButton, Page = page}
-
-    tabButton.MouseButton1Click:Connect(function()
-        for _, data in pairs(pages) do
-            data.Page.Visible = false
-            data.Button.TextColor3 = Color3.fromRGB(180, 180, 180)
-            data.Button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        end
-        page.Visible = true
-        tabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tabButton.BackgroundColor3 = Color3.fromRGB(218, 165, 32)
-    end)
-
-    return page
-end
-
-local mainPage = createCategory("Main")
-local shopPage = createCategory("Shop")
-local playerPage = createCategory("Player")
-
-pages["Main"].Page.Visible = true
-pages["Main"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-pages["Main"].Button.BackgroundColor3 = Color3.fromRGB(218, 165, 32)
-
-local function safeInvoke(id, productType)
-    local event = workspace:FindFirstChild("PromptRobuxEvent")
-    if event and event:IsA("RemoteFunction") then 
-        event:InvokeServer(id, productType) 
+boostButton.MouseButton1Click:Connect(function()
+    if not fpsBoostActive then
+        fpsBoostActive = true
+        boostButton.Text = "FPS BOOST: ACTIVE"
+        boostButton.BackgroundColor3 = Color3.fromRGB(46, 114, 184)
+        removeTextures()
     end
-end
+end)
 
-local function addBuyButton(parentPage, text, id, productType)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 45)
-    button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 14
-    button.Parent = parentPage
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
-    button.MouseButton1Click:Connect(function() 
-        safeInvoke(id, productType) 
+if goldValue then
+    initialGold = goldValue.Value
+    goldValue.Changed:Connect(function(newGold)
+        if initialGold then
+            goldEarned = newGold - initialGold
+            if goldEarned < 0 then goldEarned = 0 end
+            goldLabel.Text = "💰 Золото: +" .. tostring(goldEarned)
+        end
     end)
+else
+    goldLabel.Text = "💰 Золото: Ошибка данных"
 end
 
--- ================= НАПОЛНЕНИЕ ВКЛАДОК КНОПКАМИ =================
-
--- Кнопка Телепорта по клику мыши
-local tpClickButton = Instance.new("TextButton")
-tpClickButton.Size = UDim2.new(1, -10, 0, 50)
-tpClickButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75) -- Изначально красная
-tpClickButton.Text = "CLICK TP: OFF"
-tpClickButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpClickButton.Font = Enum.Font.GothamBold
-tpClickButton.TextSize = 14
-tpClickButton.Parent = playerPage -- Отправляем на вкладку Player
-Instance.new("UICorner", tpClickButton).CornerRadius = UDim.new(0, 8)
-
-tpClickButton.MouseButton1Click:Connect(function()
-    toggleClickTP(tpClickButton)
+task.spawn(function()
+    while true do
+        if autoFarmActive then
+            local elapsed = math.floor(os.time() - startTime) + totalSessionTime
+            local hours = math.floor(elapsed / 3600)
+            local minutes = math.floor((elapsed % 3600) / 60)
+            local seconds = elapsed % 60
+            timeLabel.Text = string.format("⏱ Время: %02d:%02d:%02d", hours, minutes, seconds)
+        end
+        task.wait(1)
+    end
 end)
 
-
--- [Вкладка MAIN] - Кнопка полного удаления
-local destroyMenuButton = Instance.new("TextButton")
-destroyMenuButton.Size = UDim2.new(1, -10, 0, 50)
-destroyMenuButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-destroyMenuButton.Text = "🚨 DESTROY ALL MENU 🚨"
-destroyMenuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-destroyMenuButton.Font = Enum.Font.GothamBold
-destroyMenuButton.TextSize = 14
-destroyMenuButton.Parent = mainPage
-Instance.new("UICorner", destroyMenuButton).CornerRadius = UDim.new(0, 8)
-
-destroyMenuButton.MouseButton1Click:Connect(function()
-    autoFarmActive = false
-    removePlatform()
-    screenGui:Destroy()
-end)
-
--- [Вкладка SHOP] - Система подарков + обычные кнопки
-createGiftUI(shopPage)
-addBuyButton(shopPage, "+3 Egg Cannons", 1161573715, "Product")
-addBuyButton(shopPage, "+4 Cookie Wheels", 1126385328, "Product")
-addBuyButton(shopPage, "+5 Duel Harpoons", 915766549, "Product")
-addBuyButton(shopPage, "+5 Dragon Harpoons", 1109792341, "Product")
-addBuyButton(shopPage, "+5 Mega Thrusters", 139121474, "Product")
-
--- [Вкладка PLAYER] - Авто-фарм
-local farmToggleButton = Instance.new("TextButton")
-farmToggleButton.Size = UDim2.new(1, -10, 0, 50)
-farmToggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
-farmToggleButton.Text = "AUTO FARM: OFF"
-farmToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-farmToggleButton.Font = Enum.Font.GothamBold
-farmToggleButton.TextSize = 14
-farmToggleButton.Parent = playerPage
-Instance.new("UICorner", farmToggleButton).CornerRadius = UDim.new(0, 8)
-
-farmToggleButton.MouseButton1Click:Connect(function()
+toggleButton.MouseButton1Click:Connect(function()
     autoFarmActive = not autoFarmActive
+    
     if autoFarmActive then
-        farmToggleButton.Text = "AUTO FARM: ON"
-        farmToggleButton.BackgroundColor3 = Color3.fromRGB(46, 184, 114)
+        toggleButton.Text = "AUTO FARM: ON"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(46, 184, 114)
+        
+        if goldValue and not initialGold then
+            initialGold = goldValue.Value
+        end
+        
+        startTime = os.time()
         task.spawn(loopAutoFarm)
     else
-        farmToggleButton.Text = "AUTO FARM: OFF"
-        farmToggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
-        removePlatform()
+        toggleButton.Text = "AUTO FARM: OFF"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
+        
+        totalSessionTime = totalSessionTime + (os.time() - startTime)
+        setCharacterVisibility(true)
     end
 end)
-
--- ================= АНИМАЦИЯ ОТКРЫТИЯ/ЗАКРЫТИЯ =================
-local isOpen = true
-local originalSize = mainFrame.Size
-
-local function toggleMenu()
-    if isOpen then
-        local closeTween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 450, 0, 0),
-            Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset + 150)
-        })
-        closeTween:Play()
-        closeTween.Completed:Connect(function() 
-            if not isOpen then mainFrame.Visible = false end 
-        end)
-    else
-        mainFrame.Visible = true
-        TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = originalSize,
-            Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset - 150)
-        }):Play()
-    end
-    isOpen = not isOpen
-end
-
-toggleButton.MouseButton1Click:Connect(toggleMenu)
-closeButton.MouseButton1Click:Connect(toggleMenu)
