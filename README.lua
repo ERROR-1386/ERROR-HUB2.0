@@ -1,139 +1,133 @@
-local TweenService = game:GetService("TweenService")
+-- =======================
+-- Автоматическая система для Build a Boat For Treasure
+-- =======================
+
+local player = game.Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
 
-local player = Players.LocalPlayer
-local gravityNormal = workspace.Gravity
-local isRunning = false
-local speed = 375
-local currentTween = nil
+-- =======================
+-- Создаем мини-UI
+-- =======================
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 
-local destinations = {
-    CFrame.new(-43.6134491, 62.1137619, 672.744934, -0.999842644, -0.00183729955, 0.017645346, 0, 0.994622767, 0.103564225, -0.0177407414, 0.103547923, -0.994466245),
-    CFrame.new(-60.1504707, 97.4659729, 8767.91406, -0.99889338, 0.000705028593, 0.0470264405, 0, 0.999887645, -0.0149902813, -0.047031723, -0.0149736926, -0.998781145),
-    CFrame.new(-54.331871, -345.398346, 9488.60645, -0.98221302, 0, 0.187770084, 0, 1, 0, -0.187770084, 0, -0.98221302),
-}
+local frame = Instance.new("Frame", ScreenGui)
+frame.Size = UDim2.new(0, 220, 0, 130)
+frame.Position = UDim2.new(1, -230, 0, 10)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.BorderSizePixel = 0
+frame.ZIndex = 10
 
-local screenGui = Instance.new("ScreenGui", game.CoreGui)
-screenGui.Name = "AutoFarmUI"
-screenGui.ResetOnSpawn = false
+local btnToggle = Instance.new("TextButton", frame)
+btnToggle.Size = UDim2.new(1, -10, 0, 30)
+btnToggle.Position = UDim2.new(0, 5, 0, 5)
+btnToggle.Text = "▶ Запустить"
+btnToggle.BackgroundColor3 = Color3.new(0.2, 0.5, 0.2)
+btnToggle.TextColor3 = Color3.new(1, 1, 1)
 
-local menu = Instance.new("Frame")
-menu.Size = UDim2.fromScale(0.2, 0.2)
-menu.Position = UDim2.fromScale(0.4, 0.4)
-menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-menu.BorderSizePixel = 0
-menu.Active = true
-menu.Draggable = true
-menu.Parent = screenGui
+local goldText = Instance.new("TextLabel", frame)
+goldText.Size = UDim2.new(1, -10, 0, 20)
+goldText.Position = UDim2.new(0, 5, 0, 40)
+goldText.Text = "Золото: 0"
+goldText.BackgroundTransparency = 1
+goldText.TextColor3 = Color3.new(1, 1, 0)
+goldText.TextSize = 14
 
-local close = Instance.new("TextButton")
-close.Size = UDim2.fromScale(0.15, 0.25)
-close.Position = UDim2.fromScale(0.82, 0.02)
-close.Text = "X"
-close.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = menu
+local timeText = Instance.new("TextLabel", frame)
+timeText.Size = UDim2.new(1, -10, 0, 20)
+timeText.Position = UDim2.new(0, 5, 0, 65)
+timeText.Text = "Время: 0 мин"
+timeText.BackgroundTransparency = 1
+timeText.TextColor3 = Color3.new(1, 1, 1)
+timeText.TextSize = 14
 
-local toggle = Instance.new("TextButton")
-toggle.Size = UDim2.fromScale(0.8, 0.5)
-toggle.Position = UDim2.fromScale(0.1, 0.4)
-toggle.Text = "AutoFarm + AntiAfk"
-toggle.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-toggle.TextColor3 = Color3.new(1, 1, 1)
-toggle.Parent = menu
+-- =======================
+-- Переменные
+-- =======================
+local autoFarm = false
+local goldCount = 0
+local secondsElapsed = 0
 
-close.MouseButton1Click:Connect(function()
-    isRunning = false
-    workspace.Gravity = gravityNormal
-    if currentTween then
-        currentTween:Cancel()
+-- =======================
+-- Включение/выключение авто-фермы
+-- =======================
+btnToggle.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    if autoFarm then
+        btnToggle.Text = "⏸ Пауза"
+    else
+        btnToggle.Text = "▶ Запустить"
     end
-    screenGui:Destroy()
 end)
 
-local function moveTo(targetCFrame, setGravity)
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local distance = (root.Position - targetCFrame.Position).Magnitude
-    local duration = distance / speed
-
-    currentTween = TweenService:Create(root, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
-    currentTween:Play()
-
-    local reached = false
-    currentTween.Completed:Connect(function()
-        reached = true
-    end)
-
-    if setGravity then
-        workspace.Gravity = gravityNormal
-    else
-        workspace.Gravity = 0
-    end
-
-    while not reached and isRunning do
-        RunService.Heartbeat:Wait()
-    end
-end
-
-task.spawn(function()
+-- =======================
+-- Таймер и сбор золота
+-- =======================
+spawn(function()
     while true do
-        task.wait(10)
-        if isRunning then
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.K, false, game)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.K, false, game)
+        wait(1)
+        if autoFarm then
+            -- Автоматическая добыча
+            -- Замените этот блок на ваш механизм поиска и клика по золоту
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj:IsA("Part") and (string.find(obj.Name, "Gold") or string.find(obj.Name, "Treasure") or string.find(obj.Name, "Collect")) then
+                    -- Создает ClickDetector, если нет
+                    local detector = obj:FindFirstChildOfClass("ClickDetector")
+                    if not detector then
+                        detector = Instance.new("ClickDetector", obj)
+                    end
+                    -- Имитируем клик
+                    pcall(function()
+                        detector:MouseClick()
+                    end)
+                    wait(0.2) -- задержка, чтобы не мешать другим
+                end
+            end
+            -- Подсчет
+            goldCount = goldCount + math.random(1, 3) -- симуляция, замените на вашу механику
+            goldText.Text = "Золото: " .. goldCount
         end
+
+        -- Обновление времени
+        secondsElapsed = secondsElapsed + 1
+        local minutes = math.floor(secondsElapsed / 60)
+        timeText.Text = "Время: " .. minutes .. " мин"
     end
 end)
 
-local function autoFarmLoop()
-    while isRunning do
-        local char = player.Character or player.CharacterAdded:Wait()
-        local root = char:WaitForChild("HumanoidRootPart", 5)
-        if not root then return end
-
-        for i, cf in ipairs(destinations) do
-            if not isRunning then return end
-            moveTo(cf, i == #destinations)
-        end
-
-        repeat
-            wait(1)
-        until player.CharacterAdded:Wait()
+-- =======================
+-- Анти-афк система
+-- =======================
+spawn(function()
+    while true do
+        wait(1100) -- чуть менее 20 минут
+        VirtualUser:CaptureController()
+        VirtualUser:SetKeyDown(Enum.KeyCode.W)
+        wait(0.1)
+        VirtualUser:SetKeyUp(Enum.KeyCode.W)
     end
+end)
+
+-- =======================
+-- Расширяемость
+-- Здесь можно добавлять новые системы
+-- =======================
+
+local systems = {}
+
+function systems:autoBuild()
+    -- пример: автоматическое строительство
+    -- вставляйте сюда свой код
 end
 
-toggle.MouseButton1Click:Connect(function()
-    isRunning = not isRunning
-    if not isRunning then
-        toggle.Text = "AutoFarm + AntiAfk"
-        workspace.Gravity = gravityNormal
-        if currentTween then
-            currentTween:Cancel()
-        end
-    else
-        toggle.Text = "Stop AutoFarm"
-        task.spawn(autoFarmLoop)
-    end
-end)
+function systems:anotherSystem()
+    -- пример: другая система
+end
 
-player.CharacterAdded:Connect(function()
-    if isRunning then
-        task.spawn(autoFarmLoop)
-    end
-end)
+-- Вызов системы (например, по условию или кнопке)
+-- systems:autoBuild()
 
-player.CharacterAdded:Connect(function()
-    if isRunning then
-        local char = player.Character or player.CharacterAdded:Wait()
-        local root = char:WaitForChild("HumanoidRootPart", 5)
-        if root then
-            wait(1)
-            moveTo(destinations[1], false)
-            task.spawn(autoFarmLoop)
-        end
-    end
-end)
+-- =======================
+-- Конец скрипта
+-- =======================
