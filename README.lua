@@ -1,212 +1,266 @@
--- Полный готовый скрипт с функциями и GUI
+local player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local Humanoid = nil
+-- =========================
+-- --- Основной функционал ---
+-- =========================
 
--- Основное выполнение после появления персонажа
+local humanoid = nil
 player.CharacterAdded:Connect(function(char)
-    Humanoid = char:WaitForChild("Humanoid")
+    humanoid = char:WaitForChild("Humanoid")
 end)
-
-if not Humanoid then
-    Humanoid = player.Character:WaitForChild("Humanoid")
+if not humanoid then
+    humanoid = player.Character:WaitForChild("Humanoid")
 end
 
-local RunService = game:GetService("RunService")
+local autoFarmActive = false
+local antiAFKActive = false
+local godMode = false
+local currentSpeed = 16 -- по умолчанию
 
--- Вспомогательная функция для проверки, готов ли Humanoid
-local function getHumanoid()
-    local character = player.Character or player.CharacterAdded:Wait()
-    return character:WaitForChild("Humanoid")
+-- Тригеры функций
+local function toggleAutoFarm()
+    autoFarmActive = not autoFarmActive
+    print("Авто-фарм: " .. (autoFarmActive and "включен" or "выключен"))
 end
 
-Humanoid = getHumanoid()
-
--- === Создаем GUI с анимациями ===
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MyGameTools"
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
-
--- Основное окно
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -175, 0.5, -125)
-MainFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-
--- Иконка настроек (иконка шестерёнки)
-local SettingsButton = Instance.new("TextButton")
-SettingsButton.Size = UDim2.new(0, 50, 0, 50)
-SettingsButton.Position = UDim2.new(1, -55, 0, 5)
-SettingsButton.BackgroundColor3 = Color3.new(0.8, 0.8, 0.8)
-SettingsButton.Text = "⚙️"
-SettingsButton.Font = Enum.Font.SourceSansBold
-SettingsButton.TextSize = 24
-SettingsButton.Parent = MainFrame
-
--- Панель настроек (скрыта по умолчанию)
-local SettingsFrame = Instance.new("Frame")
- SettingsFrame.Size = UDim2.new(0, 250, 0, 150)
-SettingsFrame.Position = UDim2.new(1, 5, 0, 55)
-SettingsFrame.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-SettingsFrame.Visible = false
-SettingsFrame.BorderSizePixel = 0
-SettingsFrame.Parent = MainFrame
-
--- Кнопка смены цвета фона
-local ColorButton = Instance.new("TextButton")
-ColorButton.Size = UDim2.new(1, -10, 0, 30)
-ColorButton.Position = UDim2.new(0, 5, 0, 5)
-ColorButton.Text = "Поменять цвет фона"
-ColorButton.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
-ColorButton.TextColor3 = Color3.new(1, 1, 1)
-ColorButton.Font = Enum.Font.SourceSans
-ColorButton.TextSize = 14
-ColorButton.Parent = SettingsFrame
-
--- Метка для ввода скорости
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Size = UDim2.new(1, -10, 0, 20)
-SpeedLabel.Position = UDim2.new(0, 5, 0, 45)
-SpeedLabel.Text = "Введите скорость:"
-SpeedLabel.TextColor3 = Color3.new(1, 1, 1)
-SpeedLabel.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-SpeedLabel.Font = Enum.Font.SourceSans
-SpeedLabel.TextSize = 14
-SpeedLabel.Parent = SettingsFrame
-
--- Поле для ввода скорости
-local SpeedBox = Instance.new("TextBox")
-SpeedBox.Size = UDim2.new(0, 100, 0, 20)
-SpeedBox.Position = UDim2.new(0, 5, 0, 70)
-SpeedBox.Text = "16"
-SpeedBox.BackgroundColor3 = Color3.new(1, 1, 1)
-SpeedBox.TextColor3 = Color3.new(0, 0, 0)
-SpeedBox.Font = Enum.Font.SourceSans
-SpeedBox.TextSize = 14
-SpeedBox.ClearTextOnFocus = false
-SpeedBox.Parent = SettingsFrame
-
--- Чекбокс для авто-фарм
-local AutoFarmCheckbox = Instance.new("TextButton")
-AutoFarmCheckbox.Size = UDim2.new(0, 20, 0, 20)
-AutoFarmCheckbox.Position = UDim2.new(0, 5, 0, 100)
-AutoFarmCheckbox.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
-AutoFarmCheckbox.Text = ""
-AutoFarmCheckbox.BorderSizePixel = 1
-AutoFarmCheckbox.Parent = SettingsFrame
-
-local AutoFarmLabel = Instance.new("TextLabel")
-AutoFarmLabel.Size = UDim2.new(1, -30, 0, 20)
-AutoFarmLabel.Position = UDim2.new(0, 30, 0, 100)
-AutoFarmLabel.Text = "Авто-фарм"
-AutoFarmLabel.TextColor3 = Color3.new(1, 1, 1)
-AutoFarmLabel.BackgroundTransparency = 1
-AutoFarmLabel.Font = Enum.Font.SourceSans
-AutoFarmLabel.TextSize = 14
-AutoFarmLabel.Parent = SettingsFrame
-
--- === Анимация открытия/закрытия настроек ===
-
-local function animateFrameOpen(frame)
-    frame.Visible = true
-    frame.Position = UDim2.new(1, 5, 0, 55)
-    for i = 0, 1, 0.1 do
-        frame.Position = UDim2.new(1 - i, 5 * (1 - i), 0, 55)
-        wait(0.02)
-    end
-    frame.Position = UDim2.new(1, 5, 0, 55)
+local function startAntiAFK()
+    spawn(function()
+        local VirtualUser = game:GetService("VirtualUser")
+        while antiAFKActive do
+            wait(300)
+            VirtualUser:CaptureController()
+            VirtualUser:SetKeyDown(Enum.KeyCode.W)
+            wait(0.1)
+            VirtualUser:SetKeyUp(Enum.KeyCode.W)
+        end
+    end)
 end
 
-local function animateFrameClose(frame)
-    for i = 0, 1, 0.1 do
-        frame.Position = UDim2.new(i, 5 * i, 0, 55)
-        wait(0.02)
-    end
-    frame.Visible = false
-end
-
--- Обработка кнопки настроек
-SettingsButton.MouseButton1Click:Connect(function()
-    if SettingsFrame.Visible then
-        animateFrameClose(SettingsFrame)
+local function toggleAntiAFK()
+    antiAFKActive = not antiAFKActive
+    if antiAFKActive then
+        startAntiAFK()
+        print("Anti-AFK активен")
     else
-        animateFrameOpen(SettingsFrame)
+        print("Anti-AFK отключен")
+    end
+end
+
+local function setSpeed(newSpeed)
+    if humanoid then
+        -- плавное изменение
+        local startSpeed = humanoid.WalkSpeed
+        local steps = 10
+        local delta = (newSpeed - startSpeed) / steps
+        for i=1,steps do
+            humanoid.WalkSpeed = humanoid.WalkSpeed + delta
+            wait(0.02)
+        end
+        humanoid.WalkSpeed = newSpeed
+        currentSpeed = newSpeed
+    end
+end
+
+local function megaJump()
+    if humanoid then
+        humanoid.JumpPower = 150
+        humanoid.Jump = true
+        wait(0.2)
+        humanoid.JumpPower = 50
+    end
+end
+
+local function toggleGodMode()
+    if humanoid then
+        if not godMode then
+            humanoid.MaxHealth = math.huge
+            humanoid.Health = math.huge
+            godMode = true
+            print("Бессмертие включено")
+        else
+            humanoid.MaxHealth = 100
+            humanoid.Health = 100
+            godMode = false
+            print("Бессмертие отключено")
+        end
+    end
+end
+
+-- Основной цикл авто-ферма/бессмертия
+spawn(function()
+    while true do
+        wait(1)
+        if autoFarmActive then
+            -- тут добавить логику авто-атаки, если нужно
+            -- пример
+            -- print("Авто-ферминг...")
+        end
+        if humanoid and godMode then
+            humanoid.Health = humanoid.MaxHealth
+        end
     end
 end)
 
--- === Анимация смены цвета ===
-local function changeColor(target)
-    local startColor = MainFrame.BackgroundColor3
-    local endColor = Color3.new(math.random(), math.random(), math.random())
-    for i = 0, 1, 0.1 do
-        MainFrame.BackgroundColor3 = startColor:Lerp(endColor, i)
-        wait(0.05)
-    end
-    MainFrame.BackgroundColor3 = endColor
+-- ============================
+-- --- Создаем GUI ---
+-- ============================
+
+local function createButton(parent, text, size, position, bgColor)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = size
+    btn.Position = position
+    btn.Text = text
+    btn.BackgroundColor3 = bgColor
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 14
+    return btn
 end
 
-ColorButton.MouseButton1Click:Connect(changeColor)
+local ScreenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
 
--- === Обработка изменения скорости с плавной анимацией ===
-local function setSpeed(targetSpeed)
-    -- Плавное изменение скорости
-    local currentSpeed = Humanoid.WalkSpeed
-    local steps = 10
-    local delta = (targetSpeed - currentSpeed) / steps
-    for i = 1, steps do
-        Humanoid.WalkSpeed = Humanoid.WalkSpeed + delta
-        wait(0.02)
+-- Главное меню
+local mainFrame = Instance.new("Frame", ScreenGui)
+mainFrame.Size = UDim2.new(0, 400, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+mainFrame.BorderSizePixel = 0
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Функции"
+title.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+
+local btnAutoFarm = createButton(mainFrame, "Авто-фарм", UDim2.new(1,-20,0,30), UDim2.new(0,10,0,40), Color3.new(0.3,0.3,0.3))
+local btnAntiAFK = createButton(mainFrame, "Анти-Афк", UDim2.new(1,-20,0,30), UDim2.new(0,10,0,80), Color3.new(0.3,0.3,0.3))
+local btnSpeed = createButton(mainFrame, "Изменить скорость", UDim2.new(1,-20,0,30), UDim2.new(0,10,0,120), Color3.new(0.3,0.3,0.3))
+local btnMegaJump = createButton(mainFrame, "Мега прыжок", UDim2.new(1,-20,0,30), UDim2.new(0,10,0,160), Color3.new(0.3,0.3,0.3))
+local btnGodMode = createButton(mainFrame, "Бессмертие", UDim2.new(1,-20,0,30), UDim2.new(0,10,0,200), Color3.new(0.3,0.3,0.3))
+
+-- Иконка шестерёнки для настроек
+local settingsFrame = Instance.new("Frame", ScreenGui)
+settingsFrame.Size = UDim2.new(0, 300, 0, 150)
+settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+settingsFrame.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
+settingsFrame.BorderSizePixel = 0
+settingsFrame.Visible = false
+
+local changeColorBtn = createButton(settingsFrame, "Изменить цвет", UDim2.new(1,-20,0,40), UDim2.new(0,10,0,10), Color3.new(0.5,0.5,0.5))
+local closeBtn = createButton(settingsFrame, "Закрыть", UDim2.new(1,-20,0,40), UDim2.new(0,10,0,60), Color3.new(0.7,0.2,0.2))
+
+-- Шаги для эффекта
+local function toggleSettings()
+    if settingsFrame.Visible then
+        -- закрываем
+        for i=0,1,0.2 do
+            settingsFrame.Position = UDim2.new(0.5, 0):Lerp(UDim2.new(0.5, -150, 0.5, -75), i)
+            wait(0.02)
+        end
+        settingsFrame.Visible = false
+    else
+        -- открываем
+        settingsFrame.Visible = true
+        settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+        for i=0,1,0.2 do
+            settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -75):Lerp(UDim2.new(0.5, -150, 0.5, -75), i)
+            wait(0.02)
+        end
     end
-    Humanoid.WalkSpeed = targetSpeed
 end
 
-SpeedBox.FocusLost:Connect(function()
-    local newSpeed = tonumber(SpeedBox.Text)
+local gearButton = Instance.new("TextButton", mainFrame)
+gearButton.Size = UDim2.new(0,50,0,50)
+gearButton.Position = UDim2.new(1, -55, 0, 5)
+gearButton.Text = "⚙️"
+gearButton.Font = Enum.Font.SourceSansBold
+gearButton.TextSize = 24
+gearButton.BackgroundColor3 = Color3.new(0.8,0.8,0.8)
+gearButton.MouseButton1Click:Connect(toggleSettings)
+
+-- ============================
+-- События on кнопки
+-- ============================
+
+btnAutoFarm.MouseButton1Click:Connect(function()
+    autoFarmActive = not autoFarmActive
+    print("Авто-ферминг: "..(autoFarmActive and "включен" or "выключен"))
+end)
+
+btnAntiAFK.MouseButton1Click:Connect(function()
+    antiAFKActive = not antiAFKActive
+    if antiAFKActive then
+        spawn(function()
+            local VirtualUser = game:GetService("VirtualUser")
+            while antiAFKActive do
+                wait(300)
+                VirtualUser:CaptureController()
+                VirtualUser:SetKeyDown(Enum.KeyCode.W)
+                wait(0.1)
+                VirtualUser:SetKeyUp(Enum.KeyCode.W)
+            end
+        end)
+        print("Anti-AFK активен")
+    else
+        print("Anti-AFK отключен")
+    end
+end)
+
+btnSpeed.MouseButton1Click:Connect(function()
+    local newSpeed = tonumber(prompt("Введите скорость", tostring(humanoid.WalkSpeed)))
     if newSpeed then
         setSpeed(newSpeed)
     end
 end)
 
--- === Обработка авто-фермы ===
-local autoFarmActive = false
-AutoFarmCheckbox.MouseButton1Click:Connect(function()
-    autoFarmActive = not autoFarmActive
-    if autoFarmActive then
-        AutoFarmCheckbox.BackgroundColor3 = Color3.new(0, 1, 0)
-        print("Авто-фарм включён")
-    else
-        AutoFarmCheckbox.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
-        print("Авто-фарм выключен")
-    end
+btnMegaJump.MouseButton1Click:Connect(function()
+    megaJump()
 end)
 
--- Основной цикл авто-фермы
-spawn(function()
-    while true do
-        wait(1)
-        if autoFarmActive then
-            -- Тут добавьте вашу логику авто-ферма
-            -- Например, поиск врагов и атака
-        end
-    end
+btnGodMode.MouseButton1Click:Connect(function()
+    toggleGodMode()
 end)
 
--- Бессмертие
-local function activateGodMode()
-    if Humanoid then
-        Humanoid.MaxHealth = math.huge
-        Humanoid.Health = math.huge
-        print("Бессмертие активировано")
-    end
+-- При нажатии "Закрыть" вызывается окно подтверждения
+local function createConfirmationWindow()
+    local confirmFrame = Instance.new("Frame", ScreenGui)
+    confirmFrame.Size = UDim2.new(0, 350, 0, 150)
+    confirmFrame.Position = UDim2.new(0.5, -175, 0.5, -75)
+    confirmFrame.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
+    confirmFrame.BorderSizePixel = 0
+
+    local confirmText = Instance.new("TextLabel", confirmFrame)
+    confirmText.Size = UDim2.new(1,0,0,50)
+    confirmText.Position = UDim2.new(0,0,0,0)
+    confirmText.Text = "Вы действительно хотите закрыть скрипт?"
+    confirmText.Font = Enum.Font.SourceSansBold
+    confirmText.TextSize = 14
+    confirmText.TextColor3 = Color3.new(1,1,1)
+
+    local btnYes = createButton(confirmFrame, "ДА", UDim2.new(0,100,0,40), UDim2.new(0,50,1,-50), Color3.new(0.7,0.2,0.2))
+    local btnNo = createButton(confirmFrame, "НЕТ", UDim2.new(0,100,0,40), UDim2.new(0,200,1,-50), Color3.new(0.2,0.7,0.2))
+
+    btnYes.MouseButton1Click:Connect(function()
+        -- Закрываем все GUI и останавливаем скрипт
+        confirmFrame:Destroy()
+        mainFrame:Destroy()
+        settingsFrame:Destroy()
+        -- здесь можно дополнительно отключать все функции или делать выход
+        -- например, ставим флаг или останавливаем цикл
+    end)
+
+    btnNo.MouseButton1Click:Connect(function()
+        -- просто закрываем окно подтверждения
+        confirmFrame:Destroy()
+    end)
+
+    return confirmFrame
 end
 
--- Инициализация
-if Humanoid then
-    activateGodMode()
-    -- Установка начальной скорости
-    local startSpeed = tonumber(SpeedBox.Text) or 16
-    setSpeed(startSpeed)
-end
+-- Обработка "Закрыть"
+mainFrame:FindFirstChild("Закрыть").MouseButton1Click:Connect(function()
+    createConfirmationWindow()
+end)
