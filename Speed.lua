@@ -163,34 +163,14 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = coreGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 160)
+mainFrame.Size = UDim2.new(0, 220, 0, 135)
 mainFrame.Position = UDim2.new(0, 30, 0, 120)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
-mainFrame.BackgroundTransparency = 0.4
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = Color3.fromRGB(85, 170, 85)
-
--- Механизм перетаскивания (InputService, dragInput, startPos)
-local UIS = game:GetService("UserInputService")
-local d, sD, sF
-mF.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        d, sD, sF = true, i.Position, mF.Position
-        i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then d = false end end)
-    end
-end)
-mF.InputChanged:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then sI = i end
-end)
-UIS.InputChanged:Connect(function(i)
-    if i == sI and d then
-        local de = i.Position - sD
-        mF.Position = UDim2.new(sF.X.Scale, sF.X.Offset + de.X, sF.Y.Scale, sF.Y.Offset + de.Y)
-    end
-end)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
@@ -213,19 +193,9 @@ toggleBtn.TextSize = 10
 toggleBtn.Parent = mainFrame
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
-local statsLabel = Instance.new("TextLabel")
-statsLabel.Size = UDim2.new(1, -30, 0, 25)
-statsLabel.Position = UDim2.new(0, 15, 0, 95)
-statsLabel.BackgroundTransparency = 1
-statsLabel.Text = "💰 Заработано: +0 золота"
-statsLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-statsLabel.Font = Enum.Font.GothamBold
-statsLabel.TextSize = 11
-statsLabel.Parent = mainFrame
-
 local destroyButton = Instance.new("TextButton")
 destroyButton.Size = UDim2.new(1, -30, 0, 25)
-destroyButton.Position = UDim2.new(0, 15, 1, -35)
+destroyButton.Position = UDim2.new(0, 15, 1, -40)
 destroyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 destroyButton.Text = "❌ УБРАТЬ GUI"
 destroyButton.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -263,25 +233,6 @@ toggleBtn.MouseButton1Click:Connect(function()
         deactivateFarm()
     else
         activateFarm()
-    end
-end)
-
--- Надежный сборщик статистики (полная замена)
-task.spawn(function()
-    local p = game:GetService("Players").LocalPlayer
-    local stats = p:WaitForChild("leaderstats", 15)
-    local gold = stats and stats:WaitForChild("Gold", 15)
-    
-    if gold then
-        initialGold = gold.Value
-        gold.Changed:Connect(function(newGold)
-            if initialGold then
-                totalGoldEarned = newGold - initialGold
-                if totalGoldEarned < 0 then totalGoldEarned = 0 end
-                -- Жесткое обновление текста на GUI объекте из строки 196
-                statsLabel.Text = "💰 Заработано: +" .. tostring(totalGoldEarned) .. " золота"
-            end
-        end)
     end
 end)
 
