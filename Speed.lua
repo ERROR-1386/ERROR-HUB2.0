@@ -209,7 +209,7 @@ Instance.new("UICorner", destroyButton).CornerRadius = UDim.new(0, 6)
 local function activateFarm()
     if farmActive then return end
     farmActive = true
-    toggleBtn.Text = "АВТО ФАРМ АКТИВЕН"
+    toggleBtn.Text = "АВТО ФАРМ АКТИВЕН✅️"
     toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     
     if goldValue and not initialGold then
@@ -223,7 +223,7 @@ end
 local function deactivateFarm()
     if not farmActive then return end
     farmActive = false
-    toggleBtn.Text = "АВТОФАРМ С REJOIN: ВЫКЛ"
+    toggleBtn.Text = "АВТОФАРМ ВЫКЛЮЧЕН❎️"
     toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
     removePlatform()
 end
