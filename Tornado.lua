@@ -126,6 +126,22 @@ TornadoRadiusInput.TextSize = 14
 TornadoRadiusInput.Parent = MainFrame
 Instance.new("UICorner", TornadoRadiusInput).CornerRadius = UDim.new(0, 6)
 
+-- Переменная состояния режима бога
+local godModeActive = false
+
+-- КНОПКА РЕЖИМА БОГА
+local GodModeButton = Instance.new("TextButton")
+GodModeButton.Size = UDim2.new(0, 140, 0, 35)
+-- Размещаем её чуть ниже кнопки полета
+GodModeButton.Position = UDim2.new(0, 20, 0, 150)
+GodModeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+GodModeButton.Text = "Режим Бога: ВЫКЛ"
+GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GodModeButton.Font = Enum.Font.SourceSans
+GodModeButton.TextSize = 16
+GodModeButton.Parent = MainFrame
+Instance.new("UICorner", GodModeButton).CornerRadius = UDim.new(0, 6)
+
 -- [3] КНОПКА ТЕЛЕПОРТАЦИИ ВСЕХ ИГРОКОВ К СЕБЕ
 local TeleportAllButton = Instance.new("TextButton")
 TeleportAllButton.Size = UDim2.new(0, 320, 0, 40)
@@ -359,5 +375,61 @@ TeleportAllButton.MouseButton1Click:Connect(function()
                 targetChar.HumanoidRootPart.CFrame = myPos + Vector3.new(math.random(-5, 5), 8, math.random(-5, 5))
             end
         end
+    end
+end)
+-- ЛОГИКА РЕЖИМА БОГА
+GodModeButton.MouseButton1Click:Connect(function()
+    godModeActive = not godModeActive
+    if godModeActive then
+        GodModeButton.Text = "Режим Бога: ВКЛ"
+        GodModeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        
+        -- Запуск бесконечного цикла проверки здоровья и защиты
+        task.spawn(function()
+            while godModeActive do
+                RunService.Heartbeat:Wait()
+                local character = LocalPlayer.Character
+                if character then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        -- 1. Мгновенное лечение до максимума
+                        if humanoid.Health < humanoid.MaxHealth then
+                            humanoid.Health = humanoid.MaxHealth
+                        end
+                        
+                        -- 2. Защита от смерти при падении здоровья до 0 (Анти-смерть)
+                        humanoid.MaxHealth = 1000000
+                        humanoid.Health = 1000000
+                    end
+                    
+                    -- 3. Удаление опасных локальных скриптов и эффектов (огня, кислоты, заморозки)
+                    for _, object in ipairs(character:GetDescendants()) do
+                        if object:IsA("Fire") or object:IsA("Smoke") or object.Name == "BurnScript" then
+                            object:Destroy()
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        GodModeButton.Text = "Режим Бога: ВЫКЛ"
+        GodModeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        -- Возвращаем стандартные параметры при выключении
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            character:FindFirstChildOfClass("Humanoid").MaxHealth = 100
+            character:FindFirstChildOfClass("Humanoid").Health = 100
+        end
+    end
+end)
+
+-- Автоматическое перевключение режима бога после респавна (если ты его не выключал)
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    if godModeActive then
+        task.wait(1) -- Ждем полной загрузки персонажа
+        local humanoid = newCharacter:WaitForChild("Humanoid")
+        humanoid.MaxHealth = 1000000
+        humanoid.Health = 1000000
     end
 end)
