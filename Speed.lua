@@ -176,7 +176,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.Position = UDim2.new(0, 0, 0, 10)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🛡️ AUTO-START + INSTANT FARM"
+titleLabel.Text = "🤙ERROR-HUB | BABFT 🚢"
 titleLabel.TextColor3 = Color3.fromRGB(100, 210, 100)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 12
@@ -209,7 +209,7 @@ Instance.new("UICorner", destroyButton).CornerRadius = UDim.new(0, 6)
 local function activateFarm()
     if farmActive then return end
     farmActive = true
-    toggleBtn.Text = "НОЧНОЙ АВТОФАРМ АКТИВЕН"
+    toggleBtn.Text = "АВТО ФАРМ АКТИВЕН"
     toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     
     if goldValue and not initialGold then
