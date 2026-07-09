@@ -172,6 +172,18 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = Color3.fromRGB(85, 170, 85)
 
+-- Код для плавного перемещения меню мышкой или пальцем
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.Position = UDim2.new(0, 0, 0, 10)
@@ -246,16 +258,22 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-if goldValue then
-    goldValue.Changed:Connect(function(newGold)
-        if initialGold then
-            totalGoldEarned = newGold - initialGold
-            if totalGoldEarned >= 0 then
-                statsLabel.Text = "💰 Заработано: +" .. tostring(totalGoldEarned) .. " золота"
+-- Надежный сборщик статистики (полная замена)
+local function setupGoldTracker()
+    local stats = localPlayer:WaitForChild("leaderstats", 15)
+    local gold = stats and stats:WaitForChild("Gold", 15)
+    
+    if gold then
+        local startVal = gold.Value
+        gold.Changed:Connect(function(new)
+            local gained = new - startVal
+            if gained >= 0 then
+                statsLabel.Text = "💰 Заработано: +" .. tostring(gained)
             end
-        end
-    end)
+        end)
+    end
 end
+task.spawn(setupGoldTracker)
 
 destroyButton.MouseButton1Click:Connect(function()
     farmActive = false
