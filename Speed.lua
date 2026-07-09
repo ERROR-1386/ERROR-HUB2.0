@@ -172,15 +172,22 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = Color3.fromRGB(85, 170, 85)
 
--- Код для плавного перемещения меню мышкой или пальцем
+-- Механизм перетаскивания (InputService, dragInput, startPos)
 local UIS = game:GetService("UserInputService")
-local dragging, dragStart, startPos
-
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
+local d, sD, sF
+mF.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        d, sD, sF = true, i.Position, mF.Position
+        i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then d = false end end)
+    end
+end)
+mF.InputChanged:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then sI = i end
+end)
+UIS.InputChanged:Connect(function(i)
+    if i == sI and d then
+        local de = i.Position - sD
+        mF.Position = UDim2.new(sF.X.Scale, sF.X.Offset + de.X, sF.Y.Scale, sF.Y.Offset + de.Y)
     end
 end)
 
