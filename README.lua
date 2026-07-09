@@ -3,7 +3,6 @@ local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local autoFarmActive = false
-local godModeActive = false
 local currentPlatform = nil
 
 -- Переменные для статистики
@@ -12,9 +11,6 @@ local totalSessionTime = 0
 local goldEarned = 0
 local initialGold = nil
 local fpsBoostActive = false
-
--- Хранилище для подключений (нужно для очистки при закрытии)
-local connections = {}
 
 -- Поиск значения золота в данных игрока
 local goldValue = localPlayer:FindFirstChild("Data") and localPlayer.Data:FindFirstChild("Gold") or localPlayer:WaitForChild("leaderstats", 5) and localPlayer.leaderstats:FindFirstChild("Gold")
@@ -53,7 +49,7 @@ local function spawnPlatform(cframe)
     currentPlatform = part
 end
 
--- Функция скрытия элементов тела
+-- Функция скрытия элементов тела (чтобы вас точно никто не увидел локально)
 local function setCharacterVisibility(visible)
     local character = localPlayer.Character
     if character then
@@ -74,11 +70,13 @@ local function loopAutoFarm()
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
         if rootPart and rootPart.Parent and humanoid then
+            -- Включаем режим невидимости (скрываем детали персонажа)
             setCharacterVisibility(false)
             
             for _, cframe in ipairs(farmPoints) do
                 if not autoFarmActive then break end
                 
+                -- Подстраховка: отключаем смерть от падения под карту
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
                 
                 spawnPlatform(cframe)
@@ -89,36 +87,15 @@ local function loopAutoFarm()
         removePlatform()
         task.wait(1)
     end
+    -- Возвращаем видимость при выключении
     setCharacterVisibility(true)
     removePlatform()
 end
 
--- ЛОГИКА БЕССМЕРТИЯ (GOD MODE)
-local function applyGodMode()
-    if not godModeActive then return end
-    local character = localPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            local scriptHealth = character:FindFirstChild("Health")
-            if scriptHealth then
-                scriptHealth:Destroy()
-            end
-        end
-    end
-end
-
-connections.CharacterAdded = localPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if godModeActive then
-        applyGodMode()
-    end
-end)
-
 -- ================= SYSTEMA ANTI-AFK =================
 local function enableAntiAFK()
     local vu = game:GetService("VirtualUser")
-    connections.AntiAFK = localPlayer.Idled:Connect(function()
+    localPlayer.Idled:Connect(function()
         vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
         task.wait(1)
         vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
@@ -148,122 +125,118 @@ local function removeTextures()
     end
 end
 
--- ================= UI MENU =================
+-- ================= UI MENU & STATS =================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FarmToggleGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Главный фрейм меню (Размер уменьшен, так как кнопка Unload уехала)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 210)
+mainFrame.Size = UDim2.new(0, 200, 0, 190)
 mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-local mainCorner = Instance.new("UICorner", mainFrame)
-mainCorner.CornerRadius = UDim.new(0, 10)
-local mainStroke = Instance.new("UIStroke", mainFrame)
-mainStroke.Color = Color3.fromRGB(60, 60, 60)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(60, 60, 60)
 
--- ================= КНОПКИ ВКЛАДОК =================
-local tabNavFrame = Instance.new("Frame")
-tabNavFrame.Size = UDim2.new(1, -20, 0, 30)
-tabNavFrame.Position = UDim2.new(0, 10, 0, 10)
-tabNavFrame.BackgroundTransparency = 1
-tabNavFrame.Parent = mainFrame
-
-local mainTabBtn = Instance.new("TextButton")
-mainTabBtn.Size = UDim2.new(0.5, -5, 1, 0)
-mainTabBtn.Position = UDim2.new(0, 0, 0, 0)
-mainTabBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-mainTabBtn.Text = "Главная"
-mainTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-mainTabBtn.Font = Enum.Font.GothamBold
-mainTabBtn.TextSize = 12
-mainTabBtn.Parent = tabNavFrame
-Instance.new("UICorner", mainTabBtn).CornerRadius = UDim.new(0, 5)
-
-local funcsTabBtn = Instance.new("TextButton")
-funcsTabBtn.Size = UDim2.new(0.5, -5, 1, 0)
-funcsTabBtn.Position = UDim2.new(0.5, 5, 0, 0)
-funcsTabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-funcsTabBtn.Text = "Функции"
-funcsTabBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-funcsTabBtn.Font = Enum.Font.GothamBold
-funcsTabBtn.TextSize = 12
-funcsTabBtn.Parent = tabNavFrame
-Instance.new("UICorner", funcsTabBtn).CornerRadius = UDim.new(0, 5)
-
--- ================= КОНТЕНТ ВКЛАДОК =================
-local mainTabContent = Instance.new("Frame")
-mainTabContent.Size = UDim2.new(1, 0, 1, -50)
-mainTabContent.Position = UDim2.new(0, 0, 0, 50)
-mainTabContent.BackgroundTransparency = 1
-mainTabContent.Parent = mainFrame
-
-local funcsTabContent = Instance.new("Frame")
-funcsTabContent.Size = UDim2.new(1, 0, 1, -50)
-funcsTabContent.Position = UDim2.new(0, 0, 0, 50)
-funcsTabContent.BackgroundTransparency = 1
-funcsTabContent.Visible = false
-funcsTabContent.Parent = mainFrame
-
--- КОНТЕНТ «ГЛАВНАЯ»
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -20, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 0)
+toggleButton.Size = UDim2.new(1, -20, 0, 40)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
 toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
 toggleButton.Text = "AUTO FARM: OFF"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.GothamBold
 toggleButton.TextSize = 13
-toggleButton.Parent = mainTabContent
+toggleButton.Parent = mainFrame
 Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
 
 local boostButton = Instance.new("TextButton")
-boostButton.Size = UDim2.new(1, -20, 0, 35)
-boostButton.Position = UDim2.new(0, 10, 0, 45)
+boostButton.Size = UDim2.new(1, -20, 0, 40)
+boostButton.Position = UDim2.new(0, 10, 0, 55)
 boostButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 boostButton.Text = "FPS BOOST: OFF"
 boostButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 boostButton.Font = Enum.Font.GothamBold
 boostButton.TextSize = 13
-boostButton.Parent = mainTabContent
+boostButton.Parent = mainFrame
 Instance.new("UICorner", boostButton).CornerRadius = UDim.new(0, 6)
 
 local timeLabel = Instance.new("TextLabel")
-timeLabel.Size = UDim2.new(1, -20, 0, 25)
-timeLabel.Position = UDim2.new(0, 10, 0, 90)
+timeLabel.Size = UDim2.new(1, -20, 0, 30)
+timeLabel.Position = UDim2.new(0, 10, 0, 110)
 timeLabel.BackgroundTransparency = 1
 timeLabel.Text = "⏱ Время: 00:00:00"
 timeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 timeLabel.Font = Enum.Font.Gotham
 timeLabel.TextSize = 13
 timeLabel.TextXAlignment = Enum.TextXAlignment.Left
-timeLabel.Parent = mainTabContent
+timeLabel.Parent = mainFrame
 
 local goldLabel = Instance.new("TextLabel")
-goldLabel.Size = UDim2.new(1, -20, 0, 25)
-goldLabel.Position = UDim2.new(0, 10, 0, 115)
+goldLabel.Size = UDim2.new(1, -20, 0, 30)
+goldLabel.Position = UDim2.new(0, 10, 0, 145)
 goldLabel.BackgroundTransparency = 1
 goldLabel.Text = "💰 Золото: +0"
 goldLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 goldLabel.Font = Enum.Font.GothamBold
 goldLabel.TextSize = 13
 goldLabel.TextXAlignment = Enum.TextXAlignment.Left
-goldLabel.Parent = mainTabContent
+goldLabel.Parent = mainFrame
 
--- КОНТЕНТ «ФУНКЦИИ»
-local godModeButton = Instance.new("TextButton")
-godModeButton.Size = UDim2.new(1, -20, 0, 40)
-godModeButton.Position = UDim2.new(0, 10, 0, 0)
-godModeButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
-godModeButton.Text = "🛡 GOD MODE: OFF"
-godModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-godModeButton.Font = Enum.Font.GothamBold
-godModeButton.TextSize = 13
-godModeButton.Parent = funcsTabContent
-Instance.new("UICorner", godModeButton).CornerRadius = UDim.new(0, 6)
+boostButton.MouseButton1Click:Connect(function()
+    if not fpsBoostActive then
+        fpsBoostActive = true
+        boostButton.Text = "FPS BOOST: ACTIVE"
+        boostButton.BackgroundColor3 = Color3.fromRGB(46, 114, 184)
+        removeTextures()
+    end
+end)
 
+if goldValue then
+    initialGold = goldValue.Value
+    goldValue.Changed:Connect(function(newGold)
+        if initialGold then
+            goldEarned = newGold - initialGold
+            if goldEarned < 0 then goldEarned = 0 end
+            goldLabel.Text = "💰 Золото: +" .. tostring(goldEarned)
+        end
+    end)
+else
+    goldLabel.Text = "💰 Золото: Ошибка данных"
+end
 
+task.spawn(function()
+    while true do
+        if autoFarmActive then
+            local elapsed = math.floor(os.time() - startTime) + totalSessionTime
+            local hours = math.floor(elapsed / 3600)
+            local minutes = math.floor((elapsed % 3600) / 60)
+            local seconds = elapsed % 60
+            timeLabel.Text = string.format("⏱ Время: %02d:%02d:%02d", hours, minutes, seconds)
+        end
+        task.wait(1)
+    end
+end)
+
+toggleButton.MouseButton1Click:Connect(function()
+    autoFarmActive = not autoFarmActive
+    
+    if autoFarmActive then
+        toggleButton.Text = "AUTO FARM: ON"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(46, 184, 114)
+        
+        if goldValue and not initialGold then
+            initialGold = goldValue.Value
+        end
+        
+        startTime = os.time()
+        task.spawn(loopAutoFarm)
+    else
+        toggleButton.Text = "AUTO FARM: OFF"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
+        
+        totalSessionTime = totalSessionTime + (os.time() - startTime)
+        setCharacterVisibility(true)
+    end
+end)
