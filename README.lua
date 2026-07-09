@@ -1,16 +1,10 @@
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local autoFarmActive = false
 local godModeActive = false
 local currentPlatform = nil
-
--- Настройки ползунков по умолчанию
-local currentWalkSpeed = 16
-local currentGravity = 196.2
 
 -- Переменные для статистики
 local startTime = 0
@@ -19,7 +13,7 @@ local goldEarned = 0
 local initialGold = nil
 local fpsBoostActive = false
 
--- Хранилище для подключений
+-- Хранилище для подключений (нужно для очистки при закрытии)
 local connections = {}
 
 -- Поиск значения золота в данных игрока
@@ -59,6 +53,7 @@ local function spawnPlatform(cframe)
     currentPlatform = part
 end
 
+-- Функция скрытия элементов тела
 local function setCharacterVisibility(visible)
     local character = localPlayer.Character
     if character then
@@ -80,9 +75,12 @@ local function loopAutoFarm()
         
         if rootPart and rootPart.Parent and humanoid then
             setCharacterVisibility(false)
+            
             for _, cframe in ipairs(farmPoints) do
                 if not autoFarmActive then break end
+                
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                
                 spawnPlatform(cframe)
                 rootPart.CFrame = cframe
                 task.wait(1)
@@ -95,7 +93,7 @@ local function loopAutoFarm()
     removePlatform()
 end
 
--- ЛОГИКА БЕССМЕРТИЯ
+-- ЛОГИКА БЕССМЕРТИЯ (GOD MODE)
 local function applyGodMode()
     if not godModeActive then return end
     local character = localPlayer.Character
@@ -103,32 +101,17 @@ local function applyGodMode()
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             local scriptHealth = character:FindFirstChild("Health")
-            if scriptHealth then scriptHealth:Destroy() end
+            if scriptHealth then
+                scriptHealth:Destroy()
+            end
         end
-    end
-end
-
--- Обновление скорости персонажа
-local function updateWalkSpeed()
-    local character = localPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.WalkSpeed = currentWalkSpeed
     end
 end
 
 connections.CharacterAdded = localPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
-    if godModeActive then applyGodMode() end
-    updateWalkSpeed() -- Возвращаем скорость после смерти
-end)
-
--- Постоянная проверка скорости (защита от сброса игрой)
-connections.SpeedLoop = RunService.RenderStepped:Connect(function()
-    local character = localPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.WalkSpeed ~= currentWalkSpeed and not autoFarmActive then
-        humanoid.WalkSpeed = currentWalkSpeed
+    if godModeActive then
+        applyGodMode()
     end
 end)
 
@@ -151,6 +134,7 @@ local function removeTextures()
             effect:Destroy()
         end
     end
+
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj ~= currentPlatform then
             obj.Material = Enum.Material.SmoothPlastic
@@ -170,9 +154,9 @@ screenGui.Name = "FarmToggleGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Главный фрейм (Высота увеличена до 270 для размещения слайдеров)
+-- Главный фрейм меню (Размер уменьшен, так как кнопка Unload уехала)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 270)
+mainFrame.Size = UDim2.new(0, 220, 0, 210)
 mainFrame.Position = UDim2.new(0, 20, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -263,3 +247,23 @@ local goldLabel = Instance.new("TextLabel")
 goldLabel.Size = UDim2.new(1, -20, 0, 25)
 goldLabel.Position = UDim2.new(0, 10, 0, 115)
 goldLabel.BackgroundTransparency = 1
+goldLabel.Text = "💰 Золото: +0"
+goldLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+goldLabel.Font = Enum.Font.GothamBold
+goldLabel.TextSize = 13
+goldLabel.TextXAlignment = Enum.TextXAlignment.Left
+goldLabel.Parent = mainTabContent
+
+-- КОНТЕНТ «ФУНКЦИИ»
+local godModeButton = Instance.new("TextButton")
+godModeButton.Size = UDim2.new(1, -20, 0, 40)
+godModeButton.Position = UDim2.new(0, 10, 0, 0)
+godModeButton.BackgroundColor3 = Color3.fromRGB(230, 75, 75)
+godModeButton.Text = "🛡 GOD MODE: OFF"
+godModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+godModeButton.Font = Enum.Font.GothamBold
+godModeButton.TextSize = 13
+godModeButton.Parent = funcsTabContent
+Instance.new("UICorner", godModeButton).CornerRadius = UDim.new(0, 6)
+
+
