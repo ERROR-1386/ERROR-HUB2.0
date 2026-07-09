@@ -297,8 +297,31 @@ TornadoButton.MouseButton1Click:Connect(function()
                             local targetPos = Vector3.new(targetX, targetY, targetZ)
                             part.CFrame = CFrame.new(part.Position:Lerp(targetPos, 0.25)) -- Плавное притяжение
                             
-                            -- Визуальный хаос: закручивание самого блока
-                            part.RotVelocity = Vector3.new(0, 15, 0)
+                                                        -- =======================================================
+                            -- АКТИВАЦИЯ ЭФФЕКТА FLING (УБИЙСТВЕННЫЙ ИМПУЛЬС СМЕРТИ)
+                            -- =======================================================
+                            -- Задаем блокам экстремально высокое хаотичное вращение. 
+                            -- Движок Roblox передает этот импульс любому, кто коснется блока.
+                            part.RotVelocity = Vector3.new(9999, 9999, 9999)
+                            
+                            -- Дополнительно толкаем блок в сторону цели с огромной силой,
+                            -- если рядом есть другие игроки (для точечного уничтожения)
+                            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                                if player ~= game:GetService("Players").LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                    local playerPos = player.Character.HumanoidRootPart.Position
+                                    -- Если чужой игрок подошел близко к летящему блоку
+                                    if (part.Position - playerPos).Magnitude < 15 then
+                                        -- Направляем блок прямо в него на бешеной скорости
+                                        part.Velocity = (playerPos - part.Position).Unit * 500
+                                    end
+                                end
+                            end
+                            -- Если игроков рядом нет, сохраняем стандартную круговую скорость
+                            if part.Velocity.Magnitude < 100 then
+                                part.Velocity = Vector3.new(math.random(-50, 50), 80, math.random(-50, 50))
+                            end
+                            -- =======================================================
+
                         end
                     end
                 end
