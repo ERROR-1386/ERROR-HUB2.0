@@ -1,9 +1,17 @@
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
 local replicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
--- Расширенный список реальных сундуков и временных блоков
+-- РЕШЕНИЕ ПРОБЛЕМЫ: Используем CoreGui вместо PlayerGui для обхода защиты игры
+local coreGui = game:GetService("CoreGui")
+
+-- Удаляем старую копию скрипта, если она уже была запущена
+if coreGui:FindFirstChild("ExtendedShopBuyerGui") then
+    coreGui.ExtendedShopBuyerGui:Destroy()
+end
+
+-- Список товаров
 local itemsList = {
     {name = "🧱 Блок Lego (Plastic)", code = "Plastic Block", color = Color3.fromRGB(230, 50, 50)},
     {name = "🎂 Блок-Торт (Cake)", code = "Cake", color = Color3.fromRGB(240, 130, 180)},
@@ -17,7 +25,7 @@ local itemsList = {
 local currentItemIndex = 1
 local purchaseCount = 1 
 
--- Функция отправки запроса на покупку выбранного предмета
+-- Функция отправки запроса на покупку
 local function buySelectedProduct()
     local selectedItem = itemsList[currentItemIndex]
     local success, err = pcall(function()
@@ -37,7 +45,7 @@ local function buySelectedProduct()
         if shopEvent and shopEvent:IsA("RemoteEvent") then
             for i = 1, purchaseCount do
                 shopEvent:FireServer(selectedItem.code, 1)
-                task.wait(0.05) -- Минимальная задержка от флуда
+                task.wait(0.05)
             end
             return true
         end
@@ -46,15 +54,15 @@ local function buySelectedProduct()
     return success
 end
 
--- ================= ИНТЕРФЕЙС GUI =================
+-- ================= ИНТЕРФЕЙС GUI (ВНУТРИ COREGUI) =================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ExtendedShopBuyerGui"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+screenGui.Parent = coreGui -- Помещаем в защищенную зону
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 230, 0, 230)
-mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.Position = UDim2.new(0, 40, 0, 150) -- Немного сместили от края для удобства
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -62,8 +70,7 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = Color3.fromRGB(60, 60, 60)
 
--- Перетаскивание меню мышкой (Draggable)
-local UserInputService = game:GetService("UserInputService")
+-- Логика плавного перетаскивания мышкой/пальцем
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -92,13 +99,13 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.Position = UDim2.new(0, 0, 0, 10)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🛒 РАСШИРЕННЫЙ МАГАЗИН"
+titleLabel.Text = "🛒 ИВЕНТОВЫЙ МАГАЗИН"
 titleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 13
 titleLabel.Parent = mainFrame
 
--- Кнопка переключения ТОВАРА
+-- Кнопка выбора ТОВАРА
 local selectItemBtn = Instance.new("TextButton")
 selectItemBtn.Size = UDim2.new(1, -30, 0, 35)
 selectItemBtn.Position = UDim2.new(0, 15, 0, 45)
@@ -106,7 +113,7 @@ selectItemBtn.BackgroundColor3 = itemsList[currentItemIndex].color
 selectItemBtn.Text = "Выбрано: " .. itemsList[currentItemIndex].name
 selectItemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 selectItemBtn.Font = Enum.Font.GothamBold
-selectItemBtn.TextSize = 12
+selectItemBtn.TextSize = 11
 selectItemBtn.Parent = mainFrame
 Instance.new("UICorner", selectItemBtn).CornerRadius = UDim.new(0, 6)
 
@@ -173,9 +180,8 @@ destroyButton.Parent = mainFrame
 Instance.new("UICorner", destroyButton).CornerRadius = UDim.new(0, 6)
 
 
--- ================= ЛОГИКА ИНТЕРФЕЙСА =================
+-- ================= ЛОГИКА ВЗАИМОДЕЙСТВИЯ =================
 
--- Переключение товаров
 selectItemBtn.MouseButton1Click:Connect(function()
     currentItemIndex = currentItemIndex + 1
     if currentItemIndex > #itemsList then currentItemIndex = 1 end
@@ -185,7 +191,6 @@ selectItemBtn.MouseButton1Click:Connect(function()
     selectItemBtn.BackgroundColor3 = item.color
 end)
 
--- Изменение количества
 minusBtn.MouseButton1Click:Connect(function()
     if purchaseCount > 1 then
         purchaseCount = purchaseCount - 1
@@ -200,7 +205,6 @@ plusBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Логика покупки
 buyBtn.MouseButton1Click:Connect(function()
     buyBtn.Active = false
     buyBtn.Text = "⏳ ОТПРАВКА ЗАПРОСОВ..."
@@ -222,7 +226,6 @@ buyBtn.MouseButton1Click:Connect(function()
     buyBtn.Active = true
 end)
 
--- Кнопка закрытия
 destroyButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
