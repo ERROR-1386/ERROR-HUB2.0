@@ -133,7 +133,7 @@ local godModeActive = false
 local GodModeButton = Instance.new("TextButton")
 GodModeButton.Size = UDim2.new(0, 140, 0, 35)
 -- Размещаем её чуть ниже кнопки полета
-GodModeButton.Position = UDim2.new(0, 20, 0, 150)
+GodModeButton.Position = UDim2.new(0, 190, 0, 150)
 GodModeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 GodModeButton.Text = "Режим Бога: ВЫКЛ"
 GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
