@@ -1,0 +1,98 @@
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- Поиск папки с квестами в игре Build a Boat
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local remoteEvents = replicatedStorage:FindFirstChild("RemoteEvents")
+
+-- Функция безопасной отправки запроса серверу на запуск квеста
+local function activateQuest(questName)
+    -- Пробуем стандартный путь для квестов в Build a Boat
+    local questEvent = replicatedStorage:FindFirstChild("SelectQuest") or replicatedStorage:FindFirstChild("SetQuest")
+    
+    if remoteEvents and remoteEvents:FindFirstChild("SelectQuest") then
+        questEvent = remoteEvents.SelectQuest
+    elseif remoteEvents and remoteEvents:FindFirstChild("SetQuest") then
+        questEvent = remoteEvents.SetQuest
+    end
+
+    if questEvent and questEvent:IsA("RemoteEvent") then
+        questEvent:FireServer(questName)
+    else
+        -- Альтернативный поиск по всему ReplicatedStorage, если разработчики сменили путь
+        local found = false
+        for _, obj in ipairs(replicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and (obj.Name == "SelectQuest" or obj.Name == "SetQuest" or obj.Name == "ActivateQuest") then
+                obj:FireServer(questName)
+                found = true
+                break
+            end
+        end
+        if not found then
+            warn("Ошибка: Не удалось найти RemoteEvent для активации квестов.")
+        end
+    end
+end
+
+-- ================= ИНТЕРФЕЙС GUI =================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "QuestActivatorGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Главное компактное окно
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 115)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color = Color3.fromRGB(60, 60, 60)
+
+-- Кнопка активации квеста на Хлеб
+local breadButton = Instance.new("TextButton")
+breadButton.Size = UDim2.new(1, -20, 0, 40)
+breadButton.Position = UDim2.new(0, 10, 0, 15)
+breadButton.BackgroundColor3 = Color3.fromRGB(230, 140, 60) -- Оранжево-хлебный цвет
+breadButton.Text = "🍞 ЗАПУСТИТЬ КВЕСТ (ХЛЕБ)"
+breadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+breadButton.Font = Enum.Font.GothamBold
+breadButton.TextSize = 11
+breadButton.Parent = mainFrame
+Instance.new("UICorner", breadButton).CornerRadius = UDim.new(0, 6)
+
+-- Кнопка полного удаления и закрытия скрипта
+local destroyButton = Instance.new("TextButton")
+destroyButton.Size = UDim2.new(1, -20, 0, 35)
+destroyButton.Position = UDim2.new(0, 10, 0, 65)
+destroyButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Красный цвет
+destroyButton.Text = "❌ UNLOAD SCRIPT"
+destroyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+destroyButton.Font = Enum.Font.GothamBold
+destroyButton.TextSize = 11
+destroyButton.Parent = mainFrame
+Instance.new("UICorner", destroyButton).CornerRadius = UDim.new(0, 6)
+
+
+-- ================= ЛОГИКА НАЖАТИЙ =================
+
+-- Клик по кнопке квеста
+breadButton.MouseButton1Click:Connect(function()
+    -- "The Boss" — внутреннее системное имя старого секретного квеста на Хлеб
+    activateQuest("The Boss")
+    
+    -- Визуальный эффект успешного нажатия
+    breadButton.Text = "✨ КВЕСТ ОТПРАВЛЕН!"
+    breadButton.BackgroundColor3 = Color3.fromRGB(75, 230, 75)
+    task.wait(2)
+    breadButton.Text = "🍞 ЗАПУСТИТЬ КВЕСТ (ХЛЕБ)"
+    breadButton.BackgroundColor3 = Color3.fromRGB(230, 140, 60)
+end)
+
+-- Полное закрытие скрипта
+destroyButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
