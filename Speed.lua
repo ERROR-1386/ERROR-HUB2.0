@@ -3,16 +3,19 @@ local localPlayer = Players.LocalPlayer
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local coreGui = game:GetService("CoreGui")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
+local GuiService = game:GetService("GuiService")
 
 -- Защита от дублирования интерфейса
-if coreGui:FindFirstChild("UltimateGoldFarmGui") then
-    coreGui.UltimateGoldFarmGui:Destroy()
+if coreGui:FindFirstChild("InstantGoldFarmGui") then
+    coreGui.InstantGoldFarmGui:Destroy()
 end
 
 local farmActive = false
 local totalGoldEarned = 0
 local initialGold = nil
 local currentPlatform = nil
+local isTeleporting = false
 
 -- Точные координаты стадий
 local fastStagePoints = {
@@ -39,19 +42,11 @@ local function applyGodMode()
         if humanoid then
             local scriptHealth = character:FindFirstChild("Health")
             if scriptHealth then
-                scriptHealth:Destroy() -- Удаляем стандартный скрипт урона / регенерации игры
+                scriptHealth:Destroy()
             end
         end
     end
 end
-
--- Автоматическое переприменение God Mode при каждом респавне
-local characterAddedCon = localPlayer.CharacterAdded:Connect(function()
-    task.wait(0.3)
-    if farmActive then
-        applyGodMode()
-    end
-end)
 
 -- Платформа под ногами
 local function removePlatform()
@@ -72,40 +67,75 @@ local function spawnPlatform(pos)
     currentPlatform = part
 end
 
--- Цикл фарма
-local function startMaxSpeedFarm()
-    while farmActive do
-        local character = localPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+-- Одиночный быстрый проход по всем стадиям
+local function runFarmCycle()
+    if isTeleporting or not farmActive then return end
+    isTeleporting = true
+    
+    local character = localPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    
+    if root and humanoid and humanoid.Health > 0 then
+        applyGodMode()
         
-        if root and humanoid and humanoid.Health > 0 then
-            applyGodMode() -- Подстраховка включения God Mode
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        
+        for i, point in ipairs(fastStagePoints) do
+            if not farmActive then break end
             
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            spawnPlatform(point)
+            root.Velocity = Vector3.new(0,0,0)
+            root.CFrame = CFrame.new(point)
             
-            for i, point in ipairs(fastStagePoints) do
-                if not farmActive then break end
-                
-                spawnPlatform(point)
-                root.Velocity = Vector3.new(0,0,0)
-                root.CFrame = CFrame.new(point)
-                
-                task.wait(1.7) 
-            end
-            
-            removePlatform()
-            task.wait(2.5)
-        else
-            removePlatform()
-            task.wait(0.5)
+            task.wait(1.6)
+        end
+        
+        removePlatform()
+    end
+    
+    isTeleporting = false
+end
+
+-- МОМЕНТАЛЬНЫЙ ТРИГГЕР: Старт без задержек при спавне
+local characterAddedCon = localPlayer.CharacterAdded:Connect(function(char)
+    if farmActive then
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        if root then
+            task.wait(0.1)
+            task.spawn(runFarmCycle)
         end
     end
-    removePlatform()
+end)
+
+-- ================= ФУНКЦИЯ AUTO-REJOIN (ПЕРЕЗАХОД ПРИ ВЫЛЕТАХ) =================
+local function safeRejoin()
+    local success, err = pcall(function()
+        if #Players:GetPlayers() <= 1 then
+            TeleportService:Teleport(game.PlaceId, localPlayer)
+        else
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
+        end
+    end)
+    if not success then
+        TeleportService:Teleport(game.PlaceId, localPlayer)
+    end
 end
+
+GuiService.ErrorMessageChanged:Connect(function()
+    task.wait(1)
+    safeRejoin()
+end)
+
+localPlayer.Idled:Connect(function()
+    local coreGuiError = coreGui:FindFirstChild("RobloxPromptGui")
+    if coreGuiError and coreGuiError:FindFirstChild("promptOverlay") then
+        safeRejoin()
+    end
+end)
 
 -- ================= УЛЬТРА ANTI-AFK (Микро-шаг вперед и прыжок раз в секунду) =================
 task.spawn(function()
@@ -115,22 +145,20 @@ task.spawn(function()
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             
             if humanoid and humanoid.Health > 0 then
-                -- 1. Симулируем нажатие прыжка
                 humanoid.Jump = true
                 
-                -- 2. Делаем микро-шаг вперед через зажатие клавиши "W" на 0.05 секунды
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
                 task.wait(0.05)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
             end
         end
-        task.wait(0.95) -- В сумме с шагом дает ровно 1 секунду интервала
+        task.wait(0.95)
     end
 end)
 
 -- ================= ИНТЕРФЕЙС GUI =================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "UltimateGoldFarmGui"
+screenGui.Name = "InstantGoldFarmGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = coreGui
 
@@ -142,14 +170,14 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
-mainStroke.Color = Color3.fromRGB(230, 140, 0) -- Золотисто-оранжевая обводка
+mainStroke.Color = Color3.fromRGB(85, 170, 85)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.Position = UDim2.new(0, 0, 0, 10)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "👑 GOD + ANTI-AFK FARM"
-titleLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+titleLabel.Text = "🛡️ AUTO-START + INSTANT FARM"
+titleLabel.TextColor3 = Color3.fromRGB(100, 210, 100)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 12
 titleLabel.Parent = mainFrame
@@ -157,11 +185,11 @@ titleLabel.Parent = mainFrame
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(1, -30, 0, 40)
 toggleBtn.Position = UDim2.new(0, 15, 0, 45)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-toggleBtn.Text = "ФАРМ: ВЫКЛ"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(210, 160, 40) -- Желтый цвет для таймера
+toggleBtn.Text = "⏳ АВТО-СТАРТ ЧЕРЕЗ: 5"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 12
+toggleBtn.TextSize = 10
 toggleBtn.Parent = mainFrame
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
@@ -186,24 +214,35 @@ destroyButton.TextSize = 10
 destroyButton.Parent = mainFrame
 Instance.new("UICorner", destroyButton).CornerRadius = UDim.new(0, 6)
 
--- ================= СВЯЗКА КНОПОК =================
+-- ================= СВЯЗКА КНОПОК И ФУНКЦИЯ АКТИВАЦИИ =================
+
+local function activateFarm()
+    if farmActive then return end
+    farmActive = true
+    toggleBtn.Text = "НОЧНОЙ АВТОФАРМ АКТИВЕН"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    
+    if goldValue and not initialGold then
+        initialGold = goldValue.Value
+    end
+    
+    applyGodMode()
+    task.spawn(runFarmCycle)
+end
+
+local function deactivateFarm()
+    if not farmActive then return end
+    farmActive = false
+    toggleBtn.Text = "АВТОФАРМ С REJOIN: ВЫКЛ"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    removePlatform()
+end
 
 toggleBtn.MouseButton1Click:Connect(function()
-    farmActive = not farmActive
     if farmActive then
-        toggleBtn.Text = "ФАРМ + ANTI-AFK АКТИВЕН"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        
-        if goldValue and not initialGold then
-            initialGold = goldValue.Value
-        end
-        
-        applyGodMode()
-        task.spawn(startMaxSpeedFarm)
+        deactivateFarm()
     else
-        toggleBtn.Text = "ФАРМ: ВЫКЛ"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        removePlatform()
+        activateFarm()
     end
 end)
 
@@ -223,4 +262,16 @@ destroyButton.MouseButton1Click:Connect(function()
     if characterAddedCon then characterAddedCon:Disconnect() end
     removePlatform()
     screenGui:Destroy()
+end)
+
+-- ЛОГИКА ТАЙМЕРА АВТО-СТАРТА (5 СЕКУНД)
+task.spawn(function()
+    for i = 5, 1, -1 do
+        if farmActive then break end -- Если пользователь нажал кнопку сам раньше времени
+        toggleBtn.Text = "⏳ АВТО-СТАРТ ЧЕРЕЗ: " .. tostring(i)
+        task.wait(1)
+    end
+    if not farmActive then
+        activateFarm()
+    end
 end)
