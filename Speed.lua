@@ -259,21 +259,23 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Надежный сборщик статистики (полная замена)
-local function setupGoldTracker()
-    local stats = localPlayer:WaitForChild("leaderstats", 15)
+task.spawn(function()
+    local p = game:GetService("Players").LocalPlayer
+    local stats = p:WaitForChild("leaderstats", 15)
     local gold = stats and stats:WaitForChild("Gold", 15)
     
     if gold then
-        local startVal = gold.Value
-        gold.Changed:Connect(function(new)
-            local gained = new - startVal
-            if gained >= 0 then
-                statsLabel.Text = "💰 Заработано: +" .. tostring(gained)
+        initialGold = gold.Value
+        gold.Changed:Connect(function(newGold)
+            if initialGold then
+                totalGoldEarned = newGold - initialGold
+                if totalGoldEarned < 0 then totalGoldEarned = 0 end
+                -- Жесткое обновление текста на GUI объекте из строки 196
+                statsLabel.Text = "💰 Заработано: +" .. tostring(totalGoldEarned) .. " золота"
             end
         end)
     end
-end
-task.spawn(setupGoldTracker)
+end)
 
 destroyButton.MouseButton1Click:Connect(function()
     farmActive = false
