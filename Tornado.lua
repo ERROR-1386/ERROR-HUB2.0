@@ -1,135 +1,157 @@
+-- Сервисы Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Удаление старой панели, если она была
+-- Удаление старой панели перед запуском нового кода
 if PlayerGui:FindFirstChild("DisasterMenuGui") then
     PlayerGui.DisasterMenuGui:Destroy()
 end
 
+-- Создание интерфейса ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DisasterMenuGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- Главное окно меню (увеличено по высоте для новых функций)
+-- Главное меню (Прямоугольное, темно-серое)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 360, 0, 310)
-MainFrame.Position = UDim2.new(0.5, -180, 0.5, -155)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Size = UDim2.new(0, 360, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -170)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
+-- Закругленные края меню
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 14)
 UICorner.Parent = MainFrame
 
--- Зеленый градиент по краю
+-- Зеленый градиент по всему краю (UIStroke + UIGradient)
 local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 3
+UIStroke.Thickness = 3.5
 UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 UIStroke.Parent = MainFrame
 
 local UIGradient = Instance.new("UIGradient")
 UIGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 120, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 100))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 100)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 160, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 0))
 })
 UIGradient.Parent = UIStroke
 
 -- Заголовок меню
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, 0, 0, 45)
 Title.BackgroundTransparency = 1
-Title.Text = "NDS God Menu (Mobile)"
+Title.Text = "🤙 ERROR-HUB | NDS 🌪"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 18
+Title.TextSize = 20
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainFrame
 
--- ПЕРЕМЕННЫЕ УПРАВЛЕНИЯ
+-- ПЕРЕМЕННЫЕ НАСТРОЕК СХЕМЫ
 local flying = false
-local noclip = false
+local noclipActive = false
 local flySpeed = 50
+
 local tornadoActive = false
-local tornadoRadius = 60
-local tornadoSpeed = 15
+local tornadoRadius = 50
+local tornadoSpeed = 10
 
--- ФУНКЦИЯ ДЛЯ СОЗДАНИЯ КНОПОК И ТЕКСТБОКСОВ (Оптимизация стиля)
-local function createButton(text, pos, size)
-    local btn = Instance.new("TextButton")
-    btn.Size = size or UDim2.new(0, 150, 0, 35)
-    btn.Position = pos
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
-    btn.Parent = MainFrame
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    return btn
-end
+-- [1] КНОПКА ПОЛЕТА
+local FlyButton = Instance.new("TextButton")
+FlyButton.Size = UDim2.new(0, 150, 0, 35)
+FlyButton.Position = UDim2.new(0, 20, 0, 60)
+FlyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+FlyButton.Text = "Полет: ВЫКЛ"
+FlyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyButton.Font = Enum.Font.SourceSansBold
+FlyButton.TextSize = 15
+FlyButton.Parent = MainFrame
+Instance.new("UICorner", FlyButton).CornerRadius = UDim.new(0, 6)
 
-local function createTextBox(text, pos, size)
-    local box = Instance.new("TextBox")
-    box.Size = size or UDim2.new(0, 150, 0, 30)
-    box.Position = pos
-    box.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    box.Text = text
-    box.TextColor3 = Color3.fromRGB(200, 200, 200)
-    box.Font = Enum.Font.SourceSans
-    box.TextSize = 14
-    box.Parent = MainFrame
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
-    return box
-end
+-- Поле ввода скорости полета
+local FlySpeedInput = Instance.new("TextBox")
+FlySpeedInput.Size = UDim2.new(0, 150, 0, 30)
+FlySpeedInput.Position = UDim2.new(0, 20, 0, 105)
+FlySpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+FlySpeedInput.Text = "Скорость полета: 50"
+FlySpeedInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+FlySpeedInput.Font = Enum.Font.SourceSans
+FlySpeedInput.TextSize = 14
+FlySpeedInput.Parent = MainFrame
+Instance.new("UICorner", FlySpeedInput).CornerRadius = UDim.new(0, 6)
 
--- СОЗДАНИЕ ЭЛЕМЕНТОВ ИНТЕРФЕЙСА
-local FlyButton = createButton("Полет: ВЫКЛ", UDim2.new(0, 20, 0, 50))
-local NoclipButton = createButton("Ноуклип: ВЫКЛ", UDim2.new(0, 20, 0, 95))
-local FlySpeedInput = createTextBox("Скорость полета: 50", UDim2.new(0, 20, 0, 140))
+-- КНОПКА НОУКЛИПА
+local NoclipButton = Instance.new("TextButton")
+NoclipButton.Size = UDim2.new(0, 150, 0, 35)
+NoclipButton.Position = UDim2.new(0, 20, 0, 150)
+NoclipButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+NoclipButton.Text = "Ноуклип: ВЫКЛ"
+NoclipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoclipButton.Font = Enum.Font.SourceSansBold
+NoclipButton.TextSize = 15
+NoclipButton.Parent = MainFrame
+Instance.new("UICorner", NoclipButton).CornerRadius = UDim.new(0, 6)
 
-local TornadoButton = createButton("Торнадо: ВЫКЛ", UDim2.new(0, 190, 0, 50))
-local TornadoRadiusInput = createTextBox("Радиус торнадо: 60", UDim2.new(0, 190, 0, 95))
+-- [2] КНОПКА ТОРНАДО
+local TornadoButton = Instance.new("TextButton")
+TornadoButton.Size = UDim2.new(0, 150, 0, 35)
+TornadoButton.Position = UDim2.new(0, 190, 0, 60)
+TornadoButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TornadoButton.Text = "Торнадо: ВЫКЛ"
+TornadoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TornadoButton.Font = Enum.Font.SourceSansBold
+TornadoButton.TextSize = 15
+TornadoButton.Parent = MainFrame
+Instance.new("UICorner", TornadoButton).CornerRadius = UDim.new(0, 6)
 
-local TeleportAllButton = createButton("ТП Всех к себе 🌀", UDim2.new(0, 190, 0, 140))
-TeleportAllButton.BackgroundColor3 = Color3.fromRGB(139, 0, 0) -- Темно-красный для опасной функции
+-- Поле ввода радиуса торнадо
+local TornadoRadiusInput = Instance.new("TextBox")
+TornadoRadiusInput.Size = UDim2.new(0, 150, 0, 30)
+TornadoRadiusInput.Position = UDim2.new(0, 190, 0, 105)
+TornadoRadiusInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TornadoRadiusInput.Text = "Радиус торнадо: 50"
+TornadoRadiusInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+TornadoRadiusInput.Font = Enum.Font.SourceSans
+TornadoRadiusInput.TextSize = 14
+TornadoRadiusInput.Parent = MainFrame
+Instance.new("UICorner", TornadoRadiusInput).CornerRadius = UDim.new(0, 6)
 
--- Кнопка Скрыть/Показать меню (для удобства на телефонах)
-local ToggleGuiBtn = Instance.new("TextButton")
-ToggleGuiBtn.Name = "ToggleGuiBtn"
-ToggleGuiBtn.Size = UDim2.new(0, 80, 0, 30)
-ToggleGuiBtn.Position = UDim2.new(0, 10, 0, 10)
-ToggleGuiBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-ToggleGuiBtn.Text = "МЕНЮ"
-ToggleGuiBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleGuiBtn.Font = Enum.Font.SourceSansBold
-ToggleGuiBtn.TextSize = 14
-ToggleGuiBtn.Parent = ScreenGui
-Instance.new("UICorner", ToggleGuiBtn).CornerRadius = UDim.new(0, 6)
+-- [3] КНОПКА ТЕЛЕПОРТАЦИИ ВСЕХ ИГРОКОВ К СЕБЕ
+local TeleportAllButton = Instance.new("TextButton")
+TeleportAllButton.Size = UDim2.new(0, 320, 0, 40)
+TeleportAllButton.Position = UDim2.new(0, 20, 0, 210)
+TeleportAllButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+TeleportAllButton.Text = "ТЕЛЕПОРТИРОВАТЬ ВСЕХ К СЕБЕ"
+TeleportAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportAllButton.Font = Enum.Font.SourceSansBold
+TeleportAllButton.TextSize = 16
+TeleportAllButton.Parent = MainFrame
+Instance.new("UICorner", TeleportAllButton).CornerRadius = UDim.new(0, 8)
 
-ToggleGuiBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
--- Инструкция
-local Credits = Instance.new("TextLabel")
-Credits.Size = UDim2.new(1, 0, 0, 40)
-Credits.Position = UDim2.new(0, 0, 1, -45)
-Credits.BackgroundTransparency = 1
-Credits.Text = "Управление: Мобильный джойстик + Камера\nТорнадо следует за вами автоматически и защищает вас"
-Credits.TextColor3 = Color3.fromRGB(150, 150, 150)
-Credits.TextSize = 12
-Credits.Font = Enum.Font.SourceSansItalic
-Credits.Parent = MainFrame
+-- Сноска-инструкция для мобильных экранов
+local MobileCredits = Instance.new("TextLabel")
+MobileCredits.Size = UDim2.new(1, 0, 0, 50)
+MobileCredits.Position = UDim2.new(0, 0, 1, -55)
+MobileCredits.BackgroundTransparency = 1
+MobileCredits.Text = "Управление полетом адаптировано под телефон.\nПолет направляется туда, куда смотрит камера.\nНоуклип отключает столкновение со стенами."
+MobileCredits.TextColor3 = Color3.fromRGB(140, 140, 140)
+MobileCredits.TextSize = 12
+MobileCredits.Font = Enum.Font.SourceSansItalic
+MobileCredits.Parent = MainFrame
 
 
--- 1. ЛОГИКА ПОЛЕТА И НОУКЛИПА
+-- ==================== ЛОГИКА ПОЛЕТА И НОУКЛИПА ====================
+
 local bodyVelocity, bodyGyro
 
 FlyButton.MouseButton1Click:Connect(function()
@@ -175,31 +197,31 @@ FlyButton.MouseButton1Click:Connect(function()
         end)
     else
         FlyButton.Text = "Полет: ВЫКЛ"
-        FlyButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        FlyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         if bodyVelocity then bodyVelocity:Destroy() end
         if bodyGyro then bodyGyro:Destroy() end
     end
 end)
 
--- Ноуклип переключатель
+-- Логика переключения режима Ноуклип (Noclip)
 NoclipButton.MouseButton1Click:Connect(function()
-    noclip = not noclip
-    if noclip then
+    noclipActive = not noclipActive
+    if noclipActive then
         NoclipButton.Text = "Ноуклип: ВКЛ"
         NoclipButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     else
         NoclipButton.Text = "Ноуклип: ВЫКЛ"
-        NoclipButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        NoclipButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     end
 end)
 
--- Постоянный цикл для Ноуклипа (чтобы не проваливаться и проходить сквозь стены при полёте)
+-- Постоянная проверка коллизий для работы ноуклипа
 RunService.Stepped:Connect(function()
-    if noclip then
+    if noclipActive then
         local character = LocalPlayer.Character
         if character then
             for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
+                if part:IsA("BasePart") then
                     part.CanCollide = false
                 end
             end
@@ -207,14 +229,21 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+-- Обновление переменной скорости при вводе в текстовое поле
 FlySpeedInput.FocusLost:Connect(function()
     local text = FlySpeedInput.Text:gsub("%D+", "")
     local num = tonumber(text)
-    if num then flySpeed = num FlySpeedInput.Text = "Скорость полета: " .. num else FlySpeedInput.Text = "Скорость полета: " .. flySpeed end
+    if num then
+        flySpeed = num
+        FlySpeedInput.Text = "Скорость полета: " .. num
+    else
+        FlySpeedInput.Text = "Скорость полета: " .. flySpeed
+    end
 end)
 
 
--- 2. УЛУЧШЕННОЕ УМНОЕ ТОРНАДО (СЛЕДУЕТ И НЕ УБИВАЕТ ИГРОКА)
+-- ==================== ЛОГИКА СМЕРТОНОСНОГО ТОРНАДО ====================
+
 TornadoButton.MouseButton1Click:Connect(function()
     tornadoActive = not tornadoActive
     if tornadoActive then
@@ -227,80 +256,85 @@ TornadoButton.MouseButton1Click:Connect(function()
                 RunService.Heartbeat:Wait()
                 local character = LocalPlayer.Character
                 if not character or not character:FindFirstChild("HumanoidRootPart") then continue end
-                
-                -- Центр торнадо ВСЕГДА привязан к текущей позиции игрока
                 local center = character.HumanoidRootPart.Position
-                angle = angle + math.rad(tornadoSpeed)
                 
-                -- Делаем так, чтобы летящие блоки не наносили нам физический урон при соприкосновении
-                for _, part in ipairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then part.Velocity = Vector3.new(0, 0, 0) end
-                end
+                angle = angle + math.rad(tornadoSpeed * 2)
                 
                 for _, part in ipairs(Workspace:GetDescendants()) do
-                    -- Захватываем незакрепленные блоки, которые не принадлежат персонажу игрока
-                    if part:IsA("BasePart") and not part.Anchored and not part:IsDescendantOf(character) and not part.Parent:FindFirstChild("Humanoid") then
-                        local distance = (part.Position - center).Magnitude
+                    if part:IsA("BasePart") and not part.Anchored then
                         
-                        -- Если блок входит в радиус действия торнадо вокруг игрока
+                        -- Полная защита вашего персонажа от затягивания
+                        if part:IsDescendantOf(character) then 
+                            continue 
+                        end
+                        
+                        local directionToPart = part.Position - center
+                        local distance = directionToPart.Magnitude
+                        
                         if distance <= tornadoRadius then
-                            -- Игнорируем блоки слишком близко к телу, чтобы они не застревали в хитбоксе персонажа (защита от урона/багов)
-                            if distance < 6 then 
-                                -- Отталкиваем их чуть дальше по радиусу
-                                part.CFrame = part.CFrame + (part.Position - center).Unit * 5
-                                continue 
+                            -- Математический конус (расширение воронки кверху)
+                            local relativeY = part.Position.Y - center.Y
+                            local currentRadius = (distance * 0.3) + (relativeY * 0.15)
+                            if currentRadius < 5 then currentRadius = 5 end
+                            
+                            -- Расчет математической спирали с турбулентностью
+                            local turbulence = math.sin(tick() * 5 + part.Position.Y) * 2
+                            local targetX = center.X + math.cos(angle + part.Position.Y * 0.08) * currentRadius + turbulence
+                            local targetZ = center.Z + math.sin(angle + part.Position.Y * 0.08) * currentRadius + turbulence
+                            local targetY = part.Position.Y + 0.9 -- Подъем блоков вверх
+                            
+                            -- Если деталь взлетела выше 45 блоков, возвращаем ее вниз воронки
+                            if relativeY > 45 then
+                                targetY = center.Y + math.random(-2, 4)
                             end
                             
--- Вычисление позиций для закручивания блоков по спирали
-local targetX = center.X + math.cos(angle + part.Position.Y * 0.1) * (distance * 0.8)
-local targetZ = center.Z + math.sin(angle + part.Position.Y * 0.1) * (distance * 0.8)
-local targetY = part.Position.Y + 1.2 -- Подъем вверх
-
--- Завихрение (если взлетели слишком высоко — засасывает обратно в воронку)
-if targetY > center.Y + 45 then 
-    targetY = center.Y - 5 
-end
-
--- Применяем силу к деталям, чтобы они плавно кружились за вами, где бы вы ни были
-part.Velocity = (Vector3.new(targetX, targetY, targetZ) - part.Position) * 7
-part.RotVelocity = Vector3.new(0, 10, 0) -- Вращение самого блока вокруг оси
-end
-end
-end
-end
-end)
-else
-TornadoButton.Text = "Торнадо: ВЫКЛ"
-TornadoButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-end
+                            -- Сильный срыв анкера (Отрываем даже намертво закрепленные дома)
+                            if part.Anchored then
+                                part.Anchored = false
+                            end
+                            
+                            -- Принудительное движение через CFrame (работает без NetworkOwnership)
+                            local targetPos = Vector3.new(targetX, targetY, targetZ)
+                            part.CFrame = CFrame.new(part.Position:Lerp(targetPos, 0.25)) -- Плавное притяжение
+                            
+                            -- Визуальный хаос: закручивание самого блока
+                            part.RotVelocity = Vector3.new(0, 15, 0)
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        TornadoButton.Text = "Торнадо: ВЫКЛ"
+        TornadoButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    end
 end)
 
--- Регулировка радиуса торнадо
+-- Обновление радиуса торнадо при потере фокуса ввода
 TornadoRadiusInput.FocusLost:Connect(function()
-local text = TornadoRadiusInput.Text:gsub("%D+", "")
-local num = tonumber(text)
-if num then 
-    tornadoRadius = num 
-    TornadoRadiusInput.Text = "Радиус торнадо: " .. num 
-else 
-    TornadoRadiusInput.Text = "Радиус торнадо: " .. tornadoRadius 
-end
+    local text = TornadoRadiusInput.Text:gsub("%D+", "")
+    local num = tonumber(text)
+    if num then
+        tornadoRadius = num
+        TornadoRadiusInput.Text = "Радиус торнадо: " .. num
+    else
+        TornadoRadiusInput.Text = "Радиус торнадо: " .. tornadoRadius
+    end
 end)
 
--- 3. ФУНКЦИЯ ТЕЛЕПОРТАЦИИ ВСЕХ ИГРОКОВ К СЕБЕ
+-- ==================== ФУНКЦИЯ ТЕЛЕПОРТАЦИИ ВСЕХ ====================
 TeleportAllButton.MouseButton1Click:Connect(function()
-local character = LocalPlayer.Character
-if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-local myPos = character.HumanoidRootPart.CFrame
-
--- Проходимся по всем игрокам на сервере
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then -- Себя не телепортируем
-        local targetChar = player.Character
-        if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-            -- Телепортируем чуть выше вас, чтобы они эпично падали в ваше торнадо
-            targetChar.HumanoidRootPart.CFrame = myPos + Vector3.new(math.random(-5, 5), 5, math.random(-5, 5))
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local myPos = character.HumanoidRootPart.CFrame
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local targetChar = player.Character
+            if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+                -- Телепортируем игроков чуть выше вас в эпицентр кружения блоков
+                targetChar.HumanoidRootPart.CFrame = myPos + Vector3.new(math.random(-5, 5), 8, math.random(-5, 5))
+            end
         end
     end
-end
 end)
