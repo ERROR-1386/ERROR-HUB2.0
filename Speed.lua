@@ -167,6 +167,7 @@ mainFrame.Size = UDim2.new(0, 220, 0, 160)
 mainFrame.Position = UDim2.new(0, 30, 0, 120)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
+mainFrame.BackgroundTransparency = 0.4
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local mainStroke = Instance.new("UIStroke", mainFrame)
