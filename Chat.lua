@@ -133,11 +133,11 @@ ToggleButton.MouseButton1Click:Connect(function()
     if MainFrame.Visible then
         ToggleButton.Text = "ЗАКРЫТЬ"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        ToggleStroke.Color = Color3.fromRGB(255, 0, 0) -- Исправлено: ToggleStroke вместо UIStroke
+        ToggleStroke.Color = Color3.fromRGB(255, 0, 0)
     else
         ToggleButton.Text = "МЕНЮ"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        ToggleStroke.Color = Color3.fromRGB(0, 255, 0) -- Исправлено: ToggleStroke вместо UIStroke
+        ToggleStroke.Color = Color3.fromRGB(0, 255, 0)
     end
 end)
 
@@ -176,29 +176,35 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ==================== ИСПОЛНЯЕМЫЕ ФУНКЦИИ И АНТИ-ЧИТ ОБХОД ====================
+-- ==================== ИСПОЛНЯЕМЫЕ ФУНКЦИИ С PCALL ЗАЩИТОЙ ====================
 
--- Умная отправка сообщений с невидимыми Unicode-маркерами от спам-фильтров
+-- Безопасная отправка сообщений (Защита от сбоя каналов чата)
 local function SendChatMessage(messageText)
-    local invisibleBypass = ""
-    for i = 1, math.random(3, 8) do
-        invisibleBypass = invisibleBypass .. utf8.char(0x200B)
-    end
-    
-    if math.random(1, 2) == 1 then
-        messageText = messageText .. " "
-    end
-    
-    local finalMessage = messageText .. invisibleBypass
-
-    local textChannel = TextChatService:FindFirstChild("TextChannels") and TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-    if textChannel then
-        textChannel:SendAsync(finalMessage)
-    else
-        local chatChannel = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
-        if chatChannel and chatChannel:FindFirstChild("SayMessageRequest") then
-            chatChannel.SayMessageRequest:FireServer(finalMessage, "All")
+    local success, err = pcall(function()
+        local invisibleBypass = ""
+        for i = 1, math.random(3, 8) do
+            invisibleBypass = invisibleBypass .. utf8.char(0x200B)
         end
+        
+        if math.random(1, 2) == 1 then
+            messageText = messageText .. " "
+        end
+        
+        local finalMessage = messageText .. invisibleBypass
+
+        local textChannel = TextChatService:FindFirstChild("TextChannels") and TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if textChannel then
+            textChannel:SendAsync(finalMessage)
+        else
+            local chatChannel = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+            if chatChannel and chatChannel:FindFirstChild("SayMessageRequest") then
+                chatChannel.SayMessageRequest:FireServer(finalMessage, "All")
+            end
+        end
+    end)
+    
+    if not success then
+        warn("[ChatControl UI]: Ошибка отправки сообщения: " .. tostring(err))
     end
 end
 
@@ -214,13 +220,21 @@ ReadButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Перехват сообщений в консоль
+-- Безопасный перехват сообщений в консоль (Защита от пустых данных игрока)
 TextChatService.MessageReceived:Connect(function(textChatMessage)
-    if readChatActive and textChatMessage.TextSource then
-        local senderUserId = textChatMessage.TextSource.UserId
-        local senderPlayer = Players:GetPlayerByUserId(senderUserId)
-        if senderPlayer then
-            print(string.format("[%s]: %s", senderPlayer.Name, textChatMessage.Text))
+    if readChatActive then
+        local success, err = pcall(function()
+            if textChatMessage.TextSource then
+                local senderUserId = textChatMessage.TextSource.UserId
+                local senderPlayer = Players:GetPlayerByUserId(senderUserId)
+                if senderPlayer then
+                    print(string.format("[%s]: %s", senderPlayer.Name, textChatMessage.Text))
+                end
+            end
+        end)
+        
+        if not success then
+            warn("[ChatControl UI]: Ошибка чтения чата: " .. tostring(err))
         end
     end
 end)
@@ -244,12 +258,17 @@ SpamButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Цикл работы Спамера
+-- Цикл работы Спамера с индивидуальной защитой итерации
 task.spawn(function()
     while true do
         task.wait(spamDelay)
         if spammerActive and spamMessage ~= "" and spamMessage ~= "Введите текст для спама..." then
-            SendChatMessage(spamMessage)
+            local success, err = pcall(function()
+                SendChatMessage(spamMessage)
+            end)
+            if not success then
+                warn("[ChatControl UI]: Критический сбой в цикле спама: " .. tostring(err))
+            end
         end
     end
 end)
