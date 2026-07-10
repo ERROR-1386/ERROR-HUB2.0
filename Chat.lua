@@ -5,7 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Удаление старой панели, если она была запущена ранее
+-- Полная очистка старых версий интерфейса перед запуском
 if PlayerGui:FindFirstChild("ChatMenuGui") then
     PlayerGui.ChatMenuGui:Destroy()
 end
@@ -18,20 +18,19 @@ ScreenGui.Parent = PlayerGui
 -- ==================== КНОПКА МЕНЮ (ОТКРЫТЬ/ЗАКРЫТЬ) ====================
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Name = "ToggleButton"
-ToggleButton.Size = UDim2.new(0, 60, 0, 35)
-ToggleButton.Position = UDim2.new(0.5, 185, 0.5, -125) -- Позиция чуть правее главного окна
-ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- Изначально открыто, кнопка красная "ЗАКРЫТЬ"
-ToggleButton.Text = "ЗАКРЫТЬ"
+ToggleButton.Size = UDim2.new(0, 80, 0, 35)
+ToggleButton.Position = UDim2.new(0.5, 185, 0.5, -125)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ToggleButton.Text = "ЗАКРЫТЬ" -- Изначально открыто
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.TextSize = 13
+ToggleButton.TextSize = 14
 ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
--- Неоновая обводка для кнопки МЕНЮ
 local ToggleStroke = Instance.new("UIStroke")
 ToggleStroke.Thickness = 2
-ToggleStroke.Color = Color3.fromRGB(255, 0, 0)
+ToggleStroke.Color = Color3.fromRGB(0, 255, 0)
 ToggleStroke.Parent = ToggleButton
 
 -- ==================== ГЛАВНОЕ ОКНО ИНТЕРФЕЙСА ====================
@@ -43,12 +42,11 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 
--- Скругление углов главного меню
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
 
--- Зеленый градиент по краю меню (UIStroke)
+-- Фирменная зеленая градиентная рамка по всему краю
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 3
 UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -72,14 +70,15 @@ Title.TextSize = 20
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainFrame
 
--- ПЕРЕМЕННЫЕ НАСТРОЕК ФУНКЦИЙ
+-- Переменные для логики скрипта
 local readChatActive = false
 local spammerActive = false
 local spamMessage = "Привет от скрипта!"
-local spamDelay = 3 -- Базовая задержка в секундах
+local spamDelay = 3
 
--- ==================== КНОПКИ ФУНКЦИЙ ВНУТРИ ОКНА ====================
--- Левая колонка: Чтение чата
+-- ==================== СОЗДАНИЕ ВНУТРЕННИХ КНОПОК ====================
+
+-- 1. Кнопка чтения чата
 local ReadButton = Instance.new("TextButton")
 ReadButton.Size = UDim2.new(0, 140, 0, 35)
 ReadButton.Position = UDim2.new(0, 20, 0, 60)
@@ -91,7 +90,7 @@ ReadButton.TextSize = 14
 ReadButton.Parent = MainFrame
 Instance.new("UICorner", ReadButton).CornerRadius = UDim.new(0, 6)
 
--- Правая колонка: Включение спамера
+-- 2. Кнопка Спамера
 local SpamButton = Instance.new("TextButton")
 SpamButton.Size = UDim2.new(0, 140, 0, 35)
 SpamButton.Position = UDim2.new(0, 190, 0, 60)
@@ -103,7 +102,7 @@ SpamButton.TextSize = 14
 SpamButton.Parent = MainFrame
 Instance.new("UICorner", SpamButton).CornerRadius = UDim.new(0, 6)
 
--- По центру: Текстовое поле ввода фраз для спама
+-- 3. Поле ввода текста спамера
 local SpamTextInput = Instance.new("TextBox")
 SpamTextInput.Size = UDim2.new(0, 310, 0, 35)
 SpamTextInput.Position = UDim2.new(0, 20, 0, 115)
@@ -115,7 +114,7 @@ SpamTextInput.TextSize = 14
 SpamTextInput.Parent = MainFrame
 Instance.new("UICorner", SpamTextInput).CornerRadius = UDim.new(0, 6)
 
--- Текст-инструкция в самом низу меню
+-- Описание внизу
 local Credits = Instance.new("TextLabel")
 Credits.Size = UDim2.new(1, 0, 0, 50)
 Credits.Position = UDim2.new(0, 0, 1, -50)
@@ -126,7 +125,9 @@ Credits.TextSize = 12
 Credits.Font = Enum.Font.SourceSansItalic
 Credits.Parent = MainFrame
 
--- ==================== СИСТЕМА СВОРАЧИВАНИЯ (ОТКРЫТЬ/ЗАКРЫТЬ) ====================
+-- ==================== ЛОГИКА ВЗАИМОДЕЙСТВИЯ С GUI ====================
+
+-- Показать / Скрыть меню
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
     if MainFrame.Visible then
@@ -140,13 +141,12 @@ ToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== ПЛАВНОЕ ПЕРЕТАСКИВАНИЕ ДЛЯ СЕНСОРА И ПК ====================
+-- Мобильное и ПК перетаскивание интерфейса
 local dragging, dragInput, dragStart, startPos
 
 local function update(input)
     local delta = input.Position - dragStart
     MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    -- Кнопка "МЕНЮ" аккуратно следует справа от основного окна при его движении
     ToggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X + 360, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
@@ -176,30 +176,25 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ==================== ЛОГИКА АНТИ-ЧИТ ОБХОДА И ФУНКЦИЙ ====================
+-- ==================== ИСПОЛНЯЕМЫЕ ФУНКЦИИ И АНТИ-ЧИТ ОБХОД ====================
 
--- Продвинутая функция отправки сообщений (Защита от фильтров и блокировок)
+-- Умная отправка сообщений с невидимыми Unicode-маркерами от спам-фильтров
 local function SendChatMessage(messageText)
-    -- АНТИ-ЧИТ ОБХОД ДУБЛИКАТОВ: Генерируем цепочку невидимых Unicode-символов (Zero-Width Space)
-    -- Для анти-чита сообщения становятся уникальными, а люди в чате видят обычный текст
     local invisibleBypass = ""
     for i = 1, math.random(3, 8) do
         invisibleBypass = invisibleBypass .. utf8.char(0x200B)
     end
     
-    -- Рандомизация пробелов на конце строки для дополнительной маскировки
     if math.random(1, 2) == 1 then
         messageText = messageText .. " "
     end
     
     local finalMessage = messageText .. invisibleBypass
 
-    -- Запуск отправки через современную систему TextChatService
     local textChannel = TextChatService:FindFirstChild("TextChannels") and TextChatService.TextChannels:FindFirstChild("RBXGeneral")
     if textChannel then
         textChannel:SendAsync(finalMessage)
     else
-        -- Запасной алгоритм отправки для старых игровых режимов (Legacy Chat)
         local chatChannel = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
         if chatChannel and chatChannel:FindFirstChild("SayMessageRequest") then
             chatChannel.SayMessageRequest:FireServer(finalMessage, "All")
@@ -207,7 +202,7 @@ local function SendChatMessage(messageText)
     end
 end
 
--- Включение / Выключение чтения чата
+-- Переключатель функции чтения чата
 ReadButton.MouseButton1Click:Connect(function()
     readChatActive = not readChatActive
     if readChatActive then
@@ -219,19 +214,18 @@ ReadButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Перехват чужих сообщений и вывод их в консоль разработчика
+-- Перехват сообщений в консоль
 TextChatService.MessageReceived:Connect(function(textChatMessage)
     if readChatActive and textChatMessage.TextSource then
         local senderUserId = textChatMessage.TextSource.UserId
         local senderPlayer = Players:GetPlayerByUserId(senderUserId)
         if senderPlayer then
-            -- Сообщения выводятся в лог (/console в чате на мобильном или F9 на ПК)
             print("[ЧАТ ЧИТА] " .. senderPlayer.Name .. ": " .. textChatMessage.Text)
         end
     end
 end)
 
--- Включение / Выключение спамера с динамическими задержками
+-- Переключатель автоматического Спамера с хаотичной задержкой сна
 SpamButton.MouseButton1Click:Connect(function()
     spammerActive = not spammerActive
     if spammerActive then
@@ -242,13 +236,11 @@ SpamButton.MouseButton1Click:Connect(function()
             while spammerActive do
                 SendChatMessage(spamMessage)
                 
-                -- АНТИ-ЧИТ ОБХОД ПО ТАЙМИНГУ:
-                -- Разрушаем циклическую отправку. Каждый раз пауза между сообщениями генерируется случайно.
-                -- Для серверных проверок это симулирует печать текста человеком.
-                local humanDelay = spamDelay + (math.random(-6, 12) / 10)
+                -- Рандомизация интервала против анти-чита
+                local humanDelay = spamDelay + (math.random(-5, 12) / 10)
                 if humanDelay < 1.6 then 
                     humanDelay = 1.6 
-                end -- Безопасный порог против кика за флуд
+                end
                 
                 task.wait(humanDelay)
             end
@@ -259,7 +251,7 @@ SpamButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Сохранение напечатанного в TextBox текста
+-- Фиксация и сохранение напечатанного в TextBox текста
 SpamTextInput.FocusLost:Connect(function(enterPressed)
     if enterPressed and SpamTextInput.Text ~= "" then
         spamMessage = SpamTextInput.Text
