@@ -96,6 +96,32 @@ Instance.new("UICorner", FlySpeedInput).CornerRadius = UDim.new(0, 6)
 
 local NoclipButton = createButton("NoclipButton", "Ноуклип: ВЫКЛ", UDim2.new(0, 190, 0, 105))
 local GunButton = createButton("GunButton", "ТП к пистолету", UDim2.new(0, 190, 0, 150))
+-- Переменные для новых функций
+local godModeActive = false
+
+-- КНОПКА БЕССМЕРТИЯ (Уклонения)
+local GodButton = Instance.new("TextButton")
+GodButton.Size = UDim2.new(0, 140, 0, 35)
+GodButton.Position = UDim2.new(0, 20, 0, 195) -- Ряд ниже, левая колонка
+GodButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+GodButton.Text = "GodMode (Уклонение): ВЫКЛ"
+GodButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GodButton.Font = Enum.Font.SourceSans
+GodButton.TextSize = 12
+GodButton.Parent = MainFrame
+Instance.new("UICorner", GodButton).CornerRadius = UDim.new(0, 6)
+
+-- КНОПКА ВЫДАЧИ НОЖА
+local GiveKnifeButton = Instance.new("TextButton")
+GiveKnifeButton.Size = UDim2.new(0, 140, 0, 35)
+GiveKnifeButton.Position = UDim2.new(0, 190, 0, 195) -- Ряд ниже, правая колонка
+GiveKnifeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+GiveKnifeButton.Text = "Получить Нож (Визуал)"
+GiveKnifeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GiveKnifeButton.Font = Enum.Font.SourceSans
+GiveKnifeButton.TextSize = 12
+GiveKnifeButton.Parent = MainFrame
+Instance.new("UICorner", GiveKnifeButton).CornerRadius = UDim.new(0, 6)
 
 -- Подпись снизу
 local Credits = Instance.new("TextLabel")
@@ -299,5 +325,91 @@ GunButton.MouseButton1Click:Connect(function()
                 GunButton.Text = originalText
             end
         end
+    end
+end)
+-- ==================== ЛОГИКА БЕССМЕРТИЯ (УКЛОНЕНИЯ) ====================
+GodButton.MouseButton1Click:Connect(function()
+    godModeActive = not godModeActive
+    if godModeActive then
+        GodButton.Text = "GodMode: ВКЛ"
+        GodButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        
+        -- Цикл слежения за убийцей
+        task.spawn(function()
+            while godModeActive do
+                RunService.Heartbeat:Wait()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    
+                    -- Ищем игрока с ножом в руках (убийцу)
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer and player.Character then
+                            local knife = player.Character:FindFirstChild("Knife") or player.Character:FindFirstChildOfClass("Tool")
+                            -- Если у кого-то в руках инструмент с названием Knife или похожим
+                            if knife and (knife.Name:lower():find("knife") or knife:FindFirstChild("Knife")) then
+                                local murdererRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                if murdererRoot then
+                                    local distance = (char.HumanoidRootPart.Position - murdererRoot.Position).Magnitude
+                                    -- Если маньяк подошел ближе чем на 12 блоков — мгновенно отлетаем назад/вверх
+                                    if distance < 12 then
+                                        char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 15, 15)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                end
+            end
+        end)
+    else
+        GodButton.Text = "GodMode: ВЫКЛ"
+        GodButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end
+end)
+
+-- ==================== ЛОГИКА ВЫДАЧИ НОЖА (КЛИЕНТ) ====================
+GiveKnifeButton.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if char and backpack then
+        -- Создаем локальный инструмент-нож
+        local FakeKnife = Instance.new("Tool")
+        FakeKnife.Name = "🔪 Нож (Клиент)"
+        FakeKnife.RequiresHandle = true
+        
+        -- Создаем лезвие ножа
+        local Handle = Instance.new("Part")
+        Handle.Name = "Handle"
+        Handle.Size = Vector3.new(0.4, 2.5, 0.4)
+        Handle.Color = Color3.fromRGB(180, 180, 180)
+        Handle.Material = Enum.Material.Metal
+        Handle.Parent = FakeKnife
+        
+        -- Эффект свечения для красоты
+        local BoxHandleAdornment = Instance.new("BoxHandleAdornment")
+        BoxHandleAdornment.Size = Handle.Size
+        BoxHandleAdornment.Color3 = Color3.fromRGB(255, 0, 0) -- Красный неоновый нож
+        BoxHandleAdornment.AlwaysOnTop = false
+        BoxHandleAdornment.Adornee = Handle
+        BoxHandleAdornment.ZIndex = 1
+        BoxHandleAdornment.Parent = Handle
+        
+        -- Анимация взмаха при клике
+        FakeKnife.Activated:Connect(function()
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Воспроизведение стандартного взмаха руки
+                local anim = Instance.new("Animation")
+                anim.AnimationId = "rbxassetid://507768375" -- Стандартный ID атаки/взмаха
+                local track = humanoid:LoadAnimation(anim)
+                track:Play()
+            end
+        end)
+        
+        FakeKnife.Parent = backpack
+        GiveKnifeButton.Text = "Нож Выдан!"
+        task.wait(1)
+        GiveKnifeButton.Text = "Получить Нож (Визуал)"
     end
 end)
