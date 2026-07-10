@@ -133,11 +133,11 @@ ToggleButton.MouseButton1Click:Connect(function()
     if MainFrame.Visible then
         ToggleButton.Text = "ЗАКРЫТЬ"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        ToggleButton.UIStroke.Color = Color3.fromRGB(255, 0, 0)
+        ToggleStroke.Color = Color3.fromRGB(255, 0, 0) -- Исправлено: ToggleStroke вместо UIStroke
     else
         ToggleButton.Text = "МЕНЮ"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        ToggleButton.UIStroke.Color = Color3.fromRGB(0, 255, 0)
+        ToggleStroke.Color = Color3.fromRGB(0, 255, 0) -- Исправлено: ToggleStroke вместо UIStroke
     end
 end)
 
@@ -220,40 +220,36 @@ TextChatService.MessageReceived:Connect(function(textChatMessage)
         local senderUserId = textChatMessage.TextSource.UserId
         local senderPlayer = Players:GetPlayerByUserId(senderUserId)
         if senderPlayer then
-            print("[ЧАТ ЧИТА] " .. senderPlayer.Name .. ": " .. textChatMessage.Text)
+            print(string.format("[%s]: %s", senderPlayer.Name, textChatMessage.Text))
         end
     end
 end)
 
--- Переключатель автоматического Спамера с хаотичной задержкой сна
+-- Сохранение текста из TextBox при нажатии Enter
+SpamTextInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        spamMessage = SpamTextInput.Text
+    end
+end)
+
+-- Переключатель Спамера
 SpamButton.MouseButton1Click:Connect(function()
     spammerActive = not spammerActive
     if spammerActive then
         SpamButton.Text = "Спамер: ВКЛ"
         SpamButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        
-        task.spawn(function()
-            while spammerActive do
-                SendChatMessage(spamMessage)
-                
-                -- Рандомизация интервала против анти-чита
-                local humanDelay = spamDelay + (math.random(-5, 12) / 10)
-                if humanDelay < 1.6 then 
-                    humanDelay = 1.6 
-                end
-                
-                task.wait(humanDelay)
-            end
-        end)
     else
         SpamButton.Text = "Спамер: ВЫКЛ"
         SpamButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     end
 end)
 
--- Фиксация и сохранение напечатанного в TextBox текста
-SpamTextInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed and SpamTextInput.Text ~= "" then
-        spamMessage = SpamTextInput.Text
+-- Цикл работы Спамера
+task.spawn(function()
+    while true do
+        task.wait(spamDelay)
+        if spammerActive and spamMessage ~= "" and spamMessage ~= "Введите текст для спама..." then
+            SendChatMessage(spamMessage)
+        end
     end
 end)
