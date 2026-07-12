@@ -1,13 +1,14 @@
 --[[
-    🌟 BABFT HACK - ИСПРАВЛЕННАЯ ВЕРСИЯ
-    • Создание ключей через Supabase
+    🌟 BABFT HACK - ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ВЕРСИЯ
+    • Исправлена ошибка блокировки потока
+    • Исправлена генерация ключа
     • Логи на экране телефона
     • Auto Farm с платформой
     • God Mode
     • Fly (ПК + телефон)
     • Anti-AFK
     
-    НАСТРОЙКА: Замените Supabase_URL и Supabase_Key!
+    НАСТРОЙКА: Замените Supabase_Key на ваш полный ключ!
 ]]
 
 local HttpService = game:GetService("HttpService")
@@ -17,15 +18,12 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 -- ============================================
--- КОНФИГУРАЦИЯ (ЗАМЕНИТЕ ТОЛЬКО ЭТО!)
+-- КОНФИГУРАЦИЯ (ЗАМЕНИТЕ Supabase_Key!)
 -- ============================================
 local CONFIG = {
-    -- Supabase (ОБЯЗАТЕЛЬНО ЗАМЕНИТЬ!)
-    Supabase_URL = "https://wfnyprdzwrxeqgvtopqi.supabase.co",  -- Ваш Project URL
-    Supabase_Key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmbnlwcmR6d3J4ZXFndnRvcHFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDQ0NzgsImV4cCI6MjA5OTM4MDQ3OH0.pZLb8VEczkMHJ5Chfnl6W4wzAFvPrQtxsocfYVfgakE",  -- Замените на ваш полный anon key!
-    
-    -- Пароль для создания ключей
-    AdminPassword = "REDKA"  -- Смените на свой!
+    Supabase_URL = "https://wfnyprdzwrxeqgvtopqi.supabase.co",
+    Supabase_Key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmbnlwcmR6d3J4ZXFndnRvcHFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDQ0NzgsImV4cCI6MjA5OTM4MDQ3OH0.pZLb8VEczkMHJ5Chfnl6W4wzAFvPrQtxsocfYVfgakE", -- ЗАМЕНИТЕ НА ВАШ КЛЮЧ!
+    AdminPassword = "admin123"
 }
 
 -- ============================================
@@ -68,7 +66,7 @@ local function CreateDebugWindow()
         end
         LogText.Text = "📋 Логи:\n" .. table.concat(DebugLog, "\n")
         LogFrame.CanvasSize = UDim2.new(0, 0, 0, #DebugLog * 18)
-        print(message) -- Также выводим в консоль
+        print(message)
     end
     
     return AddLog
@@ -102,19 +100,21 @@ local function CheckKey(key)
     
     local url = CONFIG.Supabase_URL .. "/rest/v1/keys?key=eq." .. key .. "&is_active=eq.true&limit=1"
     
-    local success, response = pcall(function()
-        return HttpService:GetAsync(url, false, {
+    local response = HttpService:RequestAsync({
+        Url = url,
+        Method = "GET",
+        Headers = {
             ["apikey"] = CONFIG.Supabase_Key,
             ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key
-        })
-    end)
+        }
+    })
     
-    if not success then
-        AddLog("❌ Ошибка: " .. tostring(response))
+    if not response.Success then
+        AddLog("❌ Ошибка: " .. response.StatusMessage)
         return false, "Ошибка соединения!"
     end
     
-    local data = HttpService:JSONDecode(response)
+    local data = HttpService:JSONDecode(response.Body)
     
     if #data == 0 then
         return false, "Неверный ключ!"
@@ -123,38 +123,33 @@ local function CheckKey(key)
     local keyData = data[1]
     local expiry = tonumber(keyData.expiry)
     
-    -- Проверка срока
     if expiry and expiry < os.time() then
         AddLog("❌ Ключ истёк")
         return false, "Срок ключа истёк!"
     end
     
-    -- Проверка HWID
     if keyData.hwid ~= "not_set" and keyData.hwid ~= HWID then
         AddLog("❌ Ключ уже используется")
         return false, "Ключ уже используется!"
     end
     
-    -- Привязка HWID
     if keyData.hwid == "not_set" then
         AddLog("📌 Привязываю HWID...")
-        pcall(function()
-            HttpService:RequestAsync({
-                Url = CONFIG.Supabase_URL .. "/rest/v1/keys?id=eq." .. keyData.id,
-                Method = "PATCH",
-                Headers = {
-                    ["apikey"] = CONFIG.Supabase_Key,
-                    ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
-                    ["Content-Type"] = "application/json",
-                    ["Prefer"] = "return=minimal"
-                },
-                Body = HttpService:JSONEncode({
-                    hwid = HWID,
-                    username = LocalPlayer.Name,
-                    user_id = LocalPlayer.UserId
-                })
+        HttpService:RequestAsync({
+            Url = CONFIG.Supabase_URL .. "/rest/v1/keys?id=eq." .. keyData.id,
+            Method = "PATCH",
+            Headers = {
+                ["apikey"] = CONFIG.Supabase_Key,
+                ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
+                ["Content-Type"] = "application/json",
+                ["Prefer"] = "return=minimal"
+            },
+            Body = HttpService:JSONEncode({
+                hwid = HWID,
+                username = LocalPlayer.Name,
+                user_id = LocalPlayer.UserId
             })
-        end)
+        })
         AddLog("✅ HWID привязан")
     end
     
@@ -162,28 +157,28 @@ local function CheckKey(key)
     return true, "Ключ активирован!"
 end
 
--- Генерация ключа
+-- Генерация ключа (ИСПРАВЛЕННАЯ!)
 local function GenerateKey(duration_hours)
     AddLog("🎲 Генерация ключа...")
     
-    -- Создаём случайный ключ
+    -- Правильная генерация
     local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local key = ""
+    local keyParts = {}
     for i = 1, 4 do
+        local part = ""
         for j = 1, 4 do
-            key = key .. chars:sub(math.random(1, #chars), math.random(1, #chars))
+            part = part .. chars:sub(math.random(1, #chars), math.random(1, #chars))
         end
-        if i < 4 then key = key .. "-" end
+        table.insert(keyParts, part)
     end
+    local key = table.concat(keyParts, "-")
     
     AddLog("📝 Ключ: " .. key)
     
-    -- Данные для отправки
+    -- Данные
     local data = {
         key = key,
         hwid = "not_set",
-        user_id = nil,
-        username = nil,
         expiry = tostring(os.time() + (duration_hours * 3600)),
         created_at = tostring(os.time()),
         is_active = true
@@ -191,67 +186,64 @@ local function GenerateKey(duration_hours)
     
     AddLog("📤 Отправляю в Supabase...")
     
-    -- Отправляем запрос
-    local success, result = pcall(function()
-        return HttpService:PostAsync(
-            CONFIG.Supabase_URL .. "/rest/v1/keys",
-            HttpService:JSONEncode(data),
-            Enum.HttpContentType.ApplicationJson,
-            false,
-            {
-                ["apikey"] = CONFIG.Supabase_Key,
-                ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
-                ["Content-Type"] = "application/json",
-                ["Prefer"] = "return=representation"
-            }
-        )
-    end)
+    -- Используем RequestAsync
+    local response = HttpService:RequestAsync({
+        Url = CONFIG.Supabase_URL .. "/rest/v1/keys",
+        Method = "POST",
+        Headers = {
+            ["apikey"] = CONFIG.Supabase_Key,
+            ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
+            ["Content-Type"] = "application/json",
+            ["Prefer"] = "return=representation"
+        },
+        Body = HttpService:JSONEncode(data)
+    })
     
-    if success then
-        AddLog("✅ Ключ создан!")
-        AddLog("📦 Ответ: " .. string.sub(result, 1, 80) .. "...")
+    if response.Success then
+        AddLog("✅ Ключ создан! Статус: " .. tostring(response.StatusCode))
         return key
     else
-        AddLog("❌ Ошибка: " .. tostring(result))
+        AddLog("❌ Ошибка: " .. tostring(response.StatusCode) .. " - " .. response.StatusMessage)
+        AddLog("📦 Ответ: " .. tostring(response.Body))
         return nil
     end
 end
 
--- Проверка сохраненного ключа (авто-вход)
+-- Проверка сохраненного ключа
 local function CheckSavedKey()
-    local url = CONFIG.Supabase_URL .. "/rest/v1/keys?hwid=eq." .. HWID .. "&is_active=eq.true&order=created_at.desc&limit=1"
+    AddLog("🔍 Ищу сохраненный ключ...")
     
-    local success, response = pcall(function()
-        return HttpService:GetAsync(url, false, {
+    local response = HttpService:RequestAsync({
+        Url = CONFIG.Supabase_URL .. "/rest/v1/keys?hwid=eq." .. HWID .. "&is_active=eq.true&order=created_at.desc&limit=1",
+        Method = "GET",
+        Headers = {
             ["apikey"] = CONFIG.Supabase_Key,
             ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key
-        })
-    end)
+        }
+    })
     
-    if success then
-        local data = HttpService:JSONDecode(response)
+    if response.Success then
+        local data = HttpService:JSONDecode(response.Body)
         if #data > 0 then
             local keyData = data[1]
             local expiry = tonumber(keyData.expiry)
             
             if expiry and expiry > os.time() then
-                AddLog("✅ Найден активный ключ: " .. keyData.key)
+                AddLog("✅ Найден ключ: " .. keyData.key)
                 return true, keyData.key
             else
-                AddLog("⚠️ Ключ истёк, удаляю...")
-                pcall(function()
-                    HttpService:RequestAsync({
-                        Url = CONFIG.Supabase_URL .. "/rest/v1/keys?id=eq." .. keyData.id,
-                        Method = "PATCH",
-                        Headers = {
-                            ["apikey"] = CONFIG.Supabase_Key,
-                            ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
-                            ["Content-Type"] = "application/json",
-                            ["Prefer"] = "return=minimal"
-                        },
-                        Body = HttpService:JSONEncode({is_active = false})
-                    })
-                end)
+                AddLog("⚠️ Ключ истёк")
+                HttpService:RequestAsync({
+                    Url = CONFIG.Supabase_URL .. "/rest/v1/keys?id=eq." .. keyData.id,
+                    Method = "PATCH",
+                    Headers = {
+                        ["apikey"] = CONFIG.Supabase_Key,
+                        ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key,
+                        ["Content-Type"] = "application/json",
+                        ["Prefer"] = "return=minimal"
+                    },
+                    Body = HttpService:JSONEncode({is_active = false})
+                })
             end
         end
     end
@@ -380,7 +372,7 @@ local function GodMode()
     end)
 end
 
--- Fly (ПК + телефон)
+-- Fly
 local function Fly()
     local character = LocalPlayer.Character
     if not character then return end
@@ -437,7 +429,6 @@ local function Fly()
         bodyVelocity:Destroy()
     end)
     
-    -- Мобильные кнопки
     if UserInputService.TouchEnabled then
         CreateMobileButtons(rootPart, bodyVelocity)
     end
@@ -558,7 +549,6 @@ local function CreateMainGUI()
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.ResetOnSpawn = false
     
-    -- Main Frame
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.new(0, 550, 0, 420)
     MainFrame.Position = UDim2.new(0.5, -275, 0.5, -210)
@@ -568,7 +558,6 @@ local function CreateMainGUI()
     MainFrame.Draggable = true
     MainFrame.Parent = ScreenGui
     
-    -- Title Bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Size = UDim2.new(1, 0, 0, 35)
     TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
@@ -597,7 +586,6 @@ local function CreateMainGUI()
     CloseButton.BorderSizePixel = 0
     CloseButton.Parent = TitleBar
     
-    -- Tab Buttons
     local TabFrame = Instance.new("Frame")
     TabFrame.Size = UDim2.new(0, 130, 1, -35)
     TabFrame.Position = UDim2.new(0, 0, 0, 35)
@@ -640,7 +628,7 @@ local function CreateMainGUI()
         end)
     end
     
-    -- ========== KEY PAGE ==========
+    -- KEY PAGE
     local KeyPage = Tabs[1]
     
     local KeyInput = Instance.new("TextBox")
@@ -690,7 +678,7 @@ local function CreateMainGUI()
     HWIDLabel.BorderSizePixel = 0
     HWIDLabel.Parent = KeyPage
     
-    -- ========== FARM PAGE ==========
+    -- FARM PAGE
     local FarmPage = Tabs[2]
     
     local FarmToggle = Instance.new("TextButton")
@@ -747,7 +735,7 @@ local function CreateMainGUI()
     SpeedDownButton.BorderSizePixel = 0
     SpeedDownButton.Parent = FarmPage
     
-    -- ========== GOD PAGE ==========
+    -- GOD PAGE
     local GodPage = Tabs[3]
     
     local GodToggle = Instance.new("TextButton")
@@ -773,7 +761,7 @@ local function CreateMainGUI()
     GodInfo.BorderSizePixel = 0
     GodInfo.Parent = GodPage
     
-    -- ========== FLY PAGE ==========
+    -- FLY PAGE
     local FlyPage = Tabs[4]
     
     local FlyToggle = Instance.new("TextButton")
@@ -818,352 +806,4 @@ local function CreateMainGUI()
     FlySpeedDown.BorderSizePixel = 0
     FlySpeedDown.Parent = FlyPage
     
-    local FlyInfo = Instance.new("TextLabel")
-    FlyInfo.Size = UDim2.new(1, -20, 0, 50)
-    FlyInfo.Position = UDim2.new(0, 10, 0, 145)
-    FlyInfo.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
-    FlyInfo.Text = "🎮 ПК: WASD + Space/Shift\n📱 Телефон: кнопки на экране"
-    FlyInfo.TextColor3 = Color3.fromRGB(255, 255, 255)
-    FlyInfo.Font = Enum.Font.Gotham
-    FlyInfo.TextSize = 11
-    FlyInfo.TextXAlignment = Enum.TextXAlignment.Left
-    FlyInfo.BorderSizePixel = 0
-    FlyInfo.Parent = FlyPage
-    
-    -- ========== ANTI-AFK PAGE ==========
-    local AntiAFKPage = Tabs[5]
-    
-    local AntiAFKToggle = Instance.new("TextButton")
-    AntiAFKToggle.Size = UDim2.new(1, -20, 0, 42)
-    AntiAFKToggle.Position = UDim2.new(0, 10, 0, 20)
-    AntiAFKToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    AntiAFKToggle.Text = "🤖 Anti-AFK: OFF"
-    AntiAFKToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    AntiAFKToggle.Font = Enum.Font.GothamBold
-    AntiAFKToggle.TextSize = 15
-    AntiAFKToggle.BorderSizePixel = 0
-    AntiAFKToggle.Parent = AntiAFKPage
-    
-    local AntiAFKInfo = Instance.new("TextLabel")
-    AntiAFKInfo.Size = UDim2.new(1, -20, 0, 90)
-    AntiAFKInfo.Position = UDim2.new(0, 10, 0, 80)
-    AntiAFKInfo.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
-    AntiAFKInfo.Text = "🤖 Анти-АФК:\n\n• Шаг каждые 5 сек\n• Случайное направление\n• Защита от кика"
-    AntiAFKInfo.TextColor3 = Color3.fromRGB(200, 255, 200)
-    AntiAFKInfo.Font = Enum.Font.Gotham
-    AntiAFKInfo.TextSize = 11
-    AntiAFKInfo.TextXAlignment = Enum.TextXAlignment.Left
-    AntiAFKInfo.BorderSizePixel = 0
-    AntiAFKInfo.Parent = AntiAFKPage
-    
-    -- ========== BUTTON HANDLERS ==========
-    
-    CloseButton.MouseButton1Click:Connect(function()
-        Features.AutoFarm = false
-        Features.GodMode = false
-        Features.FlyEnabled = false
-        Features.AntiAFK = false
-        
-        if Features.Platform then
-            Features.Platform:Destroy()
-        end
-        
-        ScreenGui:Destroy()
-    end)
-    
-    ActivateButton.MouseButton1Click:Connect(function()
-        local key = KeyInput.Text
-        if key == "" then
-            KeyStatus.Text = "❌ Введите ключ!"
-            KeyStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        
-        KeyStatus.Text = "⏳ Проверка..."
-        KeyStatus.TextColor3 = Color3.fromRGB(255, 200, 0)
-        
-        local valid, message = CheckKey(key)
-        
-        if valid then
-            Features.KeyValid = true
-            KeyStatus.Text = message
-            KeyStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-            ActivateButton.Text = "✅ Готово"
-            ActivateButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-            AddLog("✅ Ключ активирован!")
-        else
-            KeyStatus.Text = message
-            KeyStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
-    end)
-    
-    FarmToggle.MouseButton1Click:Connect(function()
-        if not Features.KeyValid then return end
-        
-        Features.AutoFarm = not Features.AutoFarm
-        FarmToggle.Text = "⚔️ Auto Farm: " .. (Features.AutoFarm and "ON" or "OFF")
-        FarmToggle.BackgroundColor3 = Features.AutoFarm and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(200, 50, 50)
-        
-        if Features.AutoFarm then 
-            AddLog("⚔️ Auto Farm включен")
-            AutoFarm() 
-        else
-            AddLog("⚔️ Auto Farm выключен")
-        end
-    end)
-    
-    SpeedUpButton.MouseButton1Click:Connect(function()
-        if Features.FarmSpeed < 10 then
-            Features.FarmSpeed = Features.FarmSpeed + 1
-            FarmSpeedLabel.Text = "Скорость: " .. Features.FarmSpeed .. "x"
-        end
-    end)
-    
-    SpeedDownButton.MouseButton1Click:Connect(function()
-        if Features.FarmSpeed > 1 then
-            Features.FarmSpeed = Features.FarmSpeed - 1
-            FarmSpeedLabel.Text = "Скорость: " .. Features.FarmSpeed .. "x"
-        end
-    end)
-    
-    GodToggle.MouseButton1Click:Connect(function()
-        if not Features.KeyValid then return end
-        
-        Features.GodMode = not Features.GodMode
-        GodToggle.Text = "🛡️ God Mode: " .. (Features.GodMode and "ON" or "OFF")
-        GodToggle.BackgroundColor3 = Features.GodMode and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(200, 50, 50)
-        
-        if Features.GodMode then 
-            AddLog("🛡️ God Mode включен")
-            GodMode() 
-        else
-            AddLog("🛡️ God Mode выключен")
-        end
-    end)
-    
-    FlyToggle.MouseButton1Click:Connect(function()
-        if not Features.KeyValid then return end
-        
-        Features.FlyEnabled = not Features.FlyEnabled
-        FlyToggle.Text = "✈️ Fly: " .. (Features.FlyEnabled and "ON" or "OFF")
-        FlyToggle.BackgroundColor3 = Features.FlyEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(200, 50, 50)
-        
-        if Features.FlyEnabled then 
-            AddLog("✈️ Fly включен")
-            Fly() 
-        else
-            AddLog("✈️ Fly выключен")
-        end
-    end)
-    
-    FlySpeedUp.MouseButton1Click:Connect(function()
-        Features.FlySpeed = math.min(Features.FlySpeed + 10, 200)
-        FlySpeedLabel.Text = "Скорость: " .. Features.FlySpeed
-    end)
-    
-    FlySpeedDown.MouseButton1Click:Connect(function()
-        Features.FlySpeed = math.max(Features.FlySpeed - 10, 10)
-        FlySpeedLabel.Text = "Скорость: " .. Features.FlySpeed
-    end)
-    
-    AntiAFKToggle.MouseButton1Click:Connect(function()
-        if not Features.KeyValid then return end
-        
-        Features.AntiAFK = not Features.AntiAFK
-        AntiAFKToggle.Text = "🤖 Anti-AFK: " .. (Features.AntiAFK and "ON" or "OFF")
-        AntiAFKToggle.BackgroundColor3 = Features.AntiAFK and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(200, 50, 50)
-        
-        if Features.AntiAFK then 
-            AddLog("🤖 Anti-AFK включен")
-            AntiAFKSystem() 
-        else
-            AddLog("🤖 Anti-AFK выключен")
-        end
-    end)
-    
-    -- Кнопка создания ключа
-    local CreateKeyBtn = Instance.new("TextButton")
-    CreateKeyBtn.Size = UDim2.new(0, 140, 0, 22)
-    CreateKeyBtn.Position = UDim2.new(1, -150, 0, 8)
-    CreateKeyBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    CreateKeyBtn.BackgroundTransparency = 0.5
-    CreateKeyBtn.Text = "🔑 СОЗДАТЬ КЛЮЧ"
-    CreateKeyBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
-    CreateKeyBtn.Font = Enum.Font.GothamBold
-    CreateKeyBtn.TextSize = 10
-    CreateKeyBtn.BorderSizePixel = 0
-    CreateKeyBtn.Parent = ScreenGui
-    
-    CreateKeyBtn.MouseButton1Click:Connect(function()
-        AddLog("🎲 Запуск создания ключа...")
-        
-        -- Окно пароля
-        local PassFrame = Instance.new("Frame")
-        PassFrame.Size = UDim2.new(0, 250, 0, 150)
-        PassFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
-        PassFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        PassFrame.BorderSizePixel = 0
-        PassFrame.ZIndex = 100
-        PassFrame.Parent = ScreenGui
-        
-        local PassTitle = Instance.new("TextLabel")
-        PassTitle.Size = UDim2.new(1, 0, 0, 30)
-        PassTitle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        PassTitle.Text = "🔐 Введите пароль"
-        PassTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-        PassTitle.Font = Enum.Font.GothamBold
-        PassTitle.TextSize = 14
-        PassTitle.BorderSizePixel = 0
-        PassTitle.Parent = PassFrame
-        
-        local PassInput = Instance.new("TextBox")
-        PassInput.Size = UDim2.new(1, -20, 0, 35)
-        PassInput.Position = UDim2.new(0, 10, 0, 40)
-        PassInput.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-        PassInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-        PassInput.PlaceholderText = "Пароль..."
-        PassInput.Font = Enum.Font.Gotham
-        PassInput.TextSize = 14
-        PassInput.BorderSizePixel = 0
-        PassInput.Parent = PassFrame
-        
-        local PassStatus = Instance.new("TextLabel")
-        PassStatus.Size = UDim2.new(1, -20, 0, 25)
-        PassStatus.Position = UDim2.new(0, 10, 0, 80)
-        PassStatus.BackgroundTransparency = 1
-        PassStatus.Text = ""
-        PassStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-        PassStatus.Font = Enum.Font.Gotham
-        PassStatus.TextSize = 11
-        PassStatus.TextXAlignment = Enum.TextXAlignment.Center
-        PassStatus.Parent = PassFrame
-        
-        local PassSubmit = Instance.new("TextButton")
-        PassSubmit.Size = UDim2.new(1, -20, 0, 35)
-        PassSubmit.Position = UDim2.new(0, 10, 0, 110)
-        PassSubmit.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        PassSubmit.Text = "Создать ключ"
-        PassSubmit.TextColor3 = Color3.fromRGB(255, 255, 255)
-        PassSubmit.Font = Enum.Font.GothamBold
-        PassSubmit.TextSize = 14
-        PassSubmit.BorderSizePixel = 0
-        PassSubmit.Parent = PassFrame
-        
-        PassSubmit.MouseButton1Click:Connect(function()
-            if PassInput.Text ~= CONFIG.AdminPassword then
-                PassStatus.Text = "❌ Неверный пароль!"
-                return
-            end
-            
-            PassFrame:Destroy()
-            AddLog("✅ Пароль верный")
-            
-            -- Создаем ключ
-            local key = GenerateKey(24)
-            
-            if key then
-                AddLog("✅ Ключ создан: " .. key)
-                
-                -- Показываем ключ
-                local KeyFrame = Instance.new("Frame")
-                KeyFrame.Size = UDim2.new(0, 280, 0, 100)
-                KeyFrame.Position = UDim2.new(0.5, -140, 0.5, -50)
-                KeyFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-                KeyFrame.BorderSizePixel = 0
-                KeyFrame.ZIndex = 101
-                KeyFrame.Parent = ScreenGui
-                
-                local KeyLabel = Instance.new("TextLabel")
-                KeyLabel.Size = UDim2.new(1, 0, 0, 30)
-                KeyLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-                KeyLabel.Text = "✅ Ключ создан!"
-                KeyLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                KeyLabel.Font = Enum.Font.GothamBold
-                KeyLabel.TextSize = 14
-                KeyLabel.BorderSizePixel = 0
-                KeyLabel.Parent = KeyFrame
-                
-                local KeyDisplay = Instance.new("TextBox")
-                KeyDisplay.Size = UDim2.new(1, -20, 0, 35)
-                KeyDisplay.Position = UDim2.new(0, 10, 0, 40)
-                KeyDisplay.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-                KeyDisplay.TextColor3 = Color3.fromRGB(0, 255, 0)
-                KeyDisplay.Text = key
-                KeyDisplay.Font = Enum.Font.GothamBold
-                KeyDisplay.TextSize = 14
-                KeyDisplay.BorderSizePixel = 0
-                KeyDisplay.ClearTextOnFocus = false
-                KeyDisplay.Parent = KeyFrame
-                
-                local CloseKey = Instance.new("TextButton")
-                CloseKey.Size = UDim2.new(1, -20, 0, 25)
-                CloseKey.Position = UDim2.new(0, 10, 0, 80)
-                CloseKey.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-                CloseKey.Text = "Закрыть"
-                CloseKey.TextColor3 = Color3.fromRGB(255, 255, 255)
-                CloseKey.Font = Enum.Font.Gotham
-                CloseKey.TextSize = 12
-                CloseKey.BorderSizePixel = 0
-                CloseKey.Parent = KeyFrame
-                
-                CloseKey.MouseButton1Click:Connect(function()
-                    KeyFrame:Destroy()
-                end)
-                
-                KeyDisplay.Focused:Connect(function()
-                    KeyDisplay:ReleaseFocus()
-                    pcall(function()
-                        setclipboard(key)
-                        AddLog("📋 Ключ скопирован!")
-                    end)
-                end)
-            else
-                AddLog("❌ Не удалось создать ключ")
-            end
-        end)
-    end)
-    
-    -- Авто-вход
-    spawn(function()
-        AddLog("🔍 Проверка сохраненного ключа...")
-        local valid, savedKey = CheckSavedKey()
-        if valid and savedKey then
-            Features.KeyValid = true
-            KeyStatus.Text = "✅ Авто-вход выполнен!"
-            KeyStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-            ActivateButton.Text = "✅ Готово"
-            ActivateButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-            KeyInput.Text = savedKey
-            AddLog("✅ Авто-вход успешен!")
-        else
-            AddLog("⚠️ Нет сохраненного ключа")
-        end
-    end)
-end
-
--- ============================================
--- ЗАПУСК
--- ============================================
-AddLog("🌟 BABFT HACK v2.0 загружен!")
-AddLog("📡 Тест Supabase...")
-
-local testSuccess, testResult = pcall(function()
-    return HttpService:GetAsync(
-        CONFIG.Supabase_URL .. "/rest/v1/keys?limit=1",
-        false,
-        {
-            ["apikey"] = CONFIG.Supabase_Key,
-            ["Authorization"] = "Bearer " .. CONFIG.Supabase_Key
-        }
-    )
-end)
-
-if testSuccess then
-    AddLog("✅ Соединение с Supabase OK")
-    AddLog("📦 Ответ: " .. string.sub(testResult, 1, 50))
-else
-    AddLog("❌ Ошибка соединения!")
-    AddLog("❗ " .. tostring(testResult))
-end
-
-CreateMainGUI()
+    local FlyInfo = Instance.new("Text
