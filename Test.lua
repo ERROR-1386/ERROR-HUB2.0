@@ -27,11 +27,11 @@ local CONFIG = {
     Keymaster_SecretKey = "ВАШ_SECRET_KEY",  -- Secret Key из Keymaster
     
     -- Supabase (для кэша ключей)
-    Supabase_URL = "https://ВАШ_ПРОЕКТ.supabase.co",
-    Supabase_Key = "ВАШ_ANON_KEY",
+    Supabase_URL = "https://wfnyprdzwrxeqgvtopqi.supabase.co",
+    Supabase_Key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmbnlwcmR6d3J4ZXFndnRvcHFpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDQ0NzgsImV4cCI6MjA5OTM4MDQ3OH0.pZLb8VEczkMHJ5Chfnl6W4wzAFvPrQtxsocfYVfgakE",
     
     -- Админ-пароль для генерации ключей
-    AdminPassword = "admin123"  -- Смените на свой!
+    AdminPassword = "REDKA"  -- Смените на свой!
 }
 
 -- ============================================
