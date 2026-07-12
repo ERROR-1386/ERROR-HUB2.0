@@ -807,3 +807,4 @@ local function CreateMainGUI()
     FlySpeedDown.Parent = FlyPage
     
     local FlyInfo = Instance.new("Text
+    CreateMainGUI()
